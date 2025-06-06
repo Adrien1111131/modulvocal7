@@ -98,36 +98,28 @@ const App: React.FC = () => {
     logger.group('Génération de la voix');
     logger.info('Début de la génération');
     
+    // Empêcher les clics multiples rapides
+    if (isLoading) {
+      logger.info('Génération déjà en cours, ignorée');
+      logger.groupEnd();
+      return;
+    }
+    
     // Variable pour stocker le texte à utiliser (presse-papiers ou existant)
     let textToUse = inputText;
-    let clipboardUsed = false;
     
-    // Essayer de coller le texte du presse-papiers d'abord
+    // Récupération rapide du texte du presse-papiers
     try {
       const clipboardText = await navigator.clipboard.readText();
       if (clipboardText.trim()) {
-        logger.info('Texte collé depuis le presse-papiers');
+        logger.info('Texte récupéré depuis le presse-papiers');
         textToUse = clipboardText;
-        clipboardUsed = true;
         
-        // Mettre à jour l'état (mais ne pas attendre la mise à jour)
+        // Mettre à jour l'état sans attendre
         setInputText(clipboardText);
-        
-        // Analyser le texte pour détecter l'environnement et l'émotion
-        try {
-          const detections = await analyzeTextEnvironments(clipboardText);
-          if (detections.length > 0) {
-            setDetectedEnvironment(detections[0].environment);
-            setDetectedEmotion(detections[0].emotionalTone);
-          }
-        } catch (err) {
-          logger.error('Erreur lors de la détection de l\'environnement et de l\'émotion:', err);
-          setDetectedEnvironment('default');
-          setDetectedEmotion('sensuel');
-        }
       }
     } catch (err) {
-      // Si l'accès au presse-papiers échoue, continuer avec le texte existant
+      // Si l'accès au presse-papiers échoue, continuer silencieusement avec le texte existant
       logger.info('Utilisation du texte existant (accès au presse-papiers impossible)');
     }
     
