@@ -38,10 +38,8 @@ const VOICE_CONFIGS: Record<string, VoiceConfig> = {
   }
 };
 
-// Variables par défaut (pour compatibilité)
+// Variable par défaut (personnage par défaut)
 const DEFAULT_VOICE = 'sasha';
-const VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || '';
-const API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || '';
 
 /**
  * Récupère la configuration de voix pour un personnage donné
