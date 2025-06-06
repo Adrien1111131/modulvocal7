@@ -6,6 +6,28 @@ import { analyzeTextEnvironments } from './services/grokService';
 import { logger } from './config/development';
 import './App.css';
 
+// Configuration des personnages disponibles
+interface Character {
+  id: string;
+  name: string;
+  description: string;
+}
+
+const CHARACTERS: Character[] = [
+  { id: 'sasha', name: 'Sasha', description: 'Voix grave' },
+  { id: 'mael', name: 'Mael', description: 'Voix douce' }
+];
+
+// Étapes du processus de génération
+enum ProcessStep {
+  IDLE = 'idle',
+  CLIPBOARD_READING = 'reading_clipboard',
+  TEXT_ANALYZING = 'analyzing_text',
+  GENERATING_VOICE = 'generating_voice',
+  COMPLETED = 'completed',
+  ERROR = 'error'
+}
+
 const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -13,6 +35,9 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [detectedEnvironment, setDetectedEnvironment] = useState<string>('default');
   const [detectedEmotion, setDetectedEmotion] = useState<string>('sensuel');
+  const [processStep, setProcessStep] = useState<ProcessStep>(ProcessStep.IDLE);
+  const [clipboardText, setClipboardText] = useState<string>('');
+  const [selectedCharacter, setSelectedCharacter] = useState<string>('sasha'); // Sasha par défaut
 
   // Récupérer le texte depuis sessionStorage lors du chargement initial
   useEffect(() => {
@@ -72,17 +97,53 @@ const App: React.FC = () => {
   const handleGenerateVoice = async () => {
     logger.group('Génération de la voix');
     logger.info('Début de la génération');
-    logger.debug('Texte actuel:', inputText);
+    
+    // Variable pour stocker le texte à utiliser (presse-papiers ou existant)
+    let textToUse = inputText;
+    let clipboardUsed = false;
+    
+    // Essayer de coller le texte du presse-papiers d'abord
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (clipboardText.trim()) {
+        logger.info('Texte collé depuis le presse-papiers');
+        textToUse = clipboardText;
+        clipboardUsed = true;
+        
+        // Mettre à jour l'état (mais ne pas attendre la mise à jour)
+        setInputText(clipboardText);
+        
+        // Analyser le texte pour détecter l'environnement et l'émotion
+        try {
+          const detections = await analyzeTextEnvironments(clipboardText);
+          if (detections.length > 0) {
+            setDetectedEnvironment(detections[0].environment);
+            setDetectedEmotion(detections[0].emotionalTone);
+          }
+        } catch (err) {
+          logger.error('Erreur lors de la détection de l\'environnement et de l\'émotion:', err);
+          setDetectedEnvironment('default');
+          setDetectedEmotion('sensuel');
+        }
+      }
+    } catch (err) {
+      // Si l'accès au presse-papiers échoue, continuer avec le texte existant
+      logger.info('Utilisation du texte existant (accès au presse-papiers impossible)');
+    }
+    
+    // Utiliser textToUse au lieu de inputText pour les logs et vérifications
+    logger.debug('Texte à utiliser:', textToUse);
     logger.debug('Environnement détecté:', detectedEnvironment);
     logger.debug('Émotion détectée:', detectedEmotion);
     
     // Afficher les logs dans la console du navigateur
     console.log('Début de la génération de la voix');
-    console.log('Texte:', inputText);
+    console.log('Texte:', textToUse);
     console.log('Environnement:', detectedEnvironment);
     console.log('Émotion:', detectedEmotion);
     
-    if (!inputText.trim()) {
+    // Vérifier si le texte à utiliser est vide
+    if (!textToUse.trim()) {
       const errorMsg = "Veuillez entrer du texte avant de générer la voix";
       logger.warn(errorMsg);
       setError(errorMsg);
@@ -96,11 +157,12 @@ const App: React.FC = () => {
       
       // Utiliser directement le texte sans ajouter de balises d'émotion
       // L'analyse sera faite par l'API Grok
-      logger.debug('Texte à analyser:', inputText);
+      logger.debug('Texte à analyser:', textToUse);
 
       // Utiliser la méthode avec environnement intégré
       console.log('Génération de voix avec environnement intégré');
-      const url = await generateVoiceWithEnvironment(inputText, true);
+      console.log('Personnage sélectionné:', selectedCharacter);
+      const url = await generateVoiceWithEnvironment(textToUse, true, selectedCharacter);
       console.log('Génération avec environnement réussie');
       
       logger.info('URL audio reçue:', url);
@@ -131,19 +193,148 @@ const App: React.FC = () => {
     }
   };
 
+  // Texte d'exemple pour démonstration
+  const exampleText = `Je sens mon corps frémir sous tes caresses délicates. 
+Chaque toucher envoie des vagues de plaisir à travers ma peau sensible.
+Viens plus près de moi, murmure-t-il doucement à mon oreille.
+Je ne peux plus résister, l'intensité me submerge complètement !`;
+
+  const handleStartWithClipboard = async () => {
+    try {
+      // Réinitialiser les états
+      setError(null);
+      setIsLoading(true);
+      setProcessStep(ProcessStep.CLIPBOARD_READING);
+      
+      // Étape 1: Essayer de lire le presse-papiers
+      try {
+        const text = await navigator.clipboard.readText();
+        setClipboardText(text);
+        
+        if (text.trim()) {
+          // Étape 2: Analyser le texte
+          setProcessStep(ProcessStep.TEXT_ANALYZING);
+          setInputText(text);
+          
+          try {
+            const detections = await analyzeTextEnvironments(text);
+            if (detections.length > 0) {
+              setDetectedEnvironment(detections[0].environment);
+              setDetectedEmotion(detections[0].emotionalTone);
+              logger.debug('Environnement détecté:', detections[0].environment);
+              logger.debug('Émotion détectée:', detections[0].emotionalTone);
+            }
+          } catch (err) {
+            logger.error('Erreur lors de la détection de l\'environnement et de l\'émotion:', err);
+            setDetectedEnvironment('default');
+            setDetectedEmotion('sensuel');
+          }
+          
+          // Étape 3: Générer la voix
+          setProcessStep(ProcessStep.GENERATING_VOICE);
+          await handleGenerateVoice();
+          
+          // Étape 4: Terminé
+          setProcessStep(ProcessStep.COMPLETED);
+        } else {
+          // Utiliser le texte d'exemple si le presse-papiers est vide
+          setInputText(exampleText);
+          setProcessStep(ProcessStep.TEXT_ANALYZING);
+          
+          try {
+            const detections = await analyzeTextEnvironments(exampleText);
+            if (detections.length > 0) {
+              setDetectedEnvironment(detections[0].environment);
+              setDetectedEmotion(detections[0].emotionalTone);
+            }
+          } catch (err) {
+            setDetectedEnvironment('default');
+            setDetectedEmotion('sensuel');
+          }
+          
+          setProcessStep(ProcessStep.GENERATING_VOICE);
+          await handleGenerateVoice();
+          setProcessStep(ProcessStep.COMPLETED);
+        }
+      } catch (clipboardErr) {
+        // En cas d'erreur d'accès au presse-papiers, utiliser le texte d'exemple
+        logger.error('Erreur lors de l\'accès au presse-papiers:', clipboardErr);
+        
+        // Vérifier d'abord sessionStorage
+        const storyText = sessionStorage.getItem('storyText');
+        
+        if (storyText && storyText.trim()) {
+          setInputText(storyText);
+        } else {
+          // Utiliser le texte d'exemple si sessionStorage est vide
+          setInputText(exampleText);
+        }
+        
+        setProcessStep(ProcessStep.TEXT_ANALYZING);
+        
+        try {
+          const textToAnalyze = storyText && storyText.trim() ? storyText : exampleText;
+          const detections = await analyzeTextEnvironments(textToAnalyze);
+          if (detections.length > 0) {
+            setDetectedEnvironment(detections[0].environment);
+            setDetectedEmotion(detections[0].emotionalTone);
+          }
+        } catch (err) {
+          setDetectedEnvironment('default');
+          setDetectedEmotion('sensuel');
+        }
+        
+        setProcessStep(ProcessStep.GENERATING_VOICE);
+        await handleGenerateVoice();
+        setProcessStep(ProcessStep.COMPLETED);
+      }
+    } catch (err) {
+      logger.error('Erreur générale:', err);
+      setError("Une erreur est survenue lors de la génération. Veuillez réessayer.");
+      setProcessStep(ProcessStep.ERROR);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="app">
-      <h1>Générateur de Voix Érotique</h1>
       <div className="app-container">
         <div className="controls-section">
-          <TextInput onTextChange={handleTextChange} initialText={inputText} />
+          {/* TextInput caché mais toujours fonctionnel */}
+          <div style={{ display: 'none' }}>
+            <TextInput onTextChange={handleTextChange} initialText={inputText} />
+          </div>
+          
+          {/* Sélecteur de personnages */}
+          <div className="character-selector">
+            {CHARACTERS.map(character => (
+              <button
+                key={character.id}
+                className={`character-button ${selectedCharacter === character.id ? 'selected' : ''}`}
+                onClick={() => setSelectedCharacter(character.id)}
+                disabled={isLoading}
+              >
+                {character.name} - {character.description}
+              </button>
+            ))}
+          </div>
+          
+          {/* Bouton Générer la Voix avec fonctionnalité de collage */}
           <button 
             onClick={handleGenerateVoice}
-            disabled={isLoading || !inputText.trim()}
+            disabled={isLoading}
             className="generate-button"
           >
             {isLoading ? 'Génération en cours...' : 'Générer la Voix'}
           </button>
+          
+          {/* Message de statut */}
+          {isLoading && (
+            <div className="status-message">
+              Génération de la voix en cours...
+            </div>
+          )}
+          
           {error && (
             <div className="error-message">
               {error}
@@ -160,6 +351,16 @@ const App: React.FC = () => {
           {audioUrl && (
             <div className="audio-info">
               Audio généré avec succès
+            </div>
+          )}
+          
+          {/* Bulle de chat pour rediriger vers le chat */}
+          {audioUrl && (
+            <div className="chat-bubble" onClick={() => window.open('https://chatmodul.vercel.app/', '_blank')}>
+              <div className="chat-bubble-content">
+                <div className="chat-icon">💬</div>
+                <div className="chat-text">Viens discuter avec nous</div>
+              </div>
             </div>
           )}
         </div>

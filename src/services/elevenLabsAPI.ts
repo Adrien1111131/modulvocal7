@@ -15,22 +15,72 @@ import {
   SegmentWithTiming
 } from './elevenlabs/index';
 
+// Configuration des voix disponibles
+interface VoiceConfig {
+  voiceId: string;
+  apiKey: string;
+  name: string;
+  description: string;
+}
+
+const VOICE_CONFIGS: Record<string, VoiceConfig> = {
+  sasha: {
+    voiceId: import.meta.env.VITE_ELEVENLABS_VOICE_ID_SASHA || '',
+    apiKey: import.meta.env.VITE_ELEVENLABS_API_KEY_SASHA || '',
+    name: 'Sasha',
+    description: 'Voix grave'
+  },
+  mael: {
+    voiceId: import.meta.env.VITE_ELEVENLABS_VOICE_ID_MAEL || '',
+    apiKey: import.meta.env.VITE_ELEVENLABS_API_KEY_MAEL || '',
+    name: 'Mael',
+    description: 'Voix douce'
+  }
+};
+
+// Variables par défaut (pour compatibilité)
+const DEFAULT_VOICE = 'sasha';
 const VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || '';
 const API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || '';
-const API_URL = `${config.api.baseUrl}/text-to-speech/${VOICE_ID}`;
+
+/**
+ * Récupère la configuration de voix pour un personnage donné
+ * @param character Le personnage sélectionné ('sasha' ou 'mael')
+ * @returns La configuration de voix correspondante
+ */
+const getVoiceConfig = (character: string = DEFAULT_VOICE): VoiceConfig => {
+  if (VOICE_CONFIGS[character]) {
+    return VOICE_CONFIGS[character];
+  }
+  
+  logger.warn(`Personnage "${character}" non trouvé, utilisation de "${DEFAULT_VOICE}"`);
+  return VOICE_CONFIGS[DEFAULT_VOICE];
+};
+
+/**
+ * Construit l'URL de l'API pour un personnage donné
+ * @param character Le personnage sélectionné
+ * @returns L'URL de l'API
+ */
+const getApiUrl = (character: string = DEFAULT_VOICE): string => {
+  const voiceConfig = getVoiceConfig(character);
+  return `${config.api.baseUrl}/text-to-speech/${voiceConfig.voiceId}`;
+};
 
 // Vérification de la présence des variables d'environnement
-if (!VOICE_ID || !API_KEY) {
-  logger.error('Variables d\'environnement manquantes: VITE_ELEVENLABS_VOICE_ID ou VITE_ELEVENLABS_API_KEY');
-  console.error('Variables d\'environnement manquantes: VITE_ELEVENLABS_VOICE_ID ou VITE_ELEVENLABS_API_KEY');
+if (!VOICE_CONFIGS.sasha.voiceId || !VOICE_CONFIGS.sasha.apiKey || 
+    !VOICE_CONFIGS.mael.voiceId || !VOICE_CONFIGS.mael.apiKey) {
+  logger.error('Variables d\'environnement manquantes pour les voix');
+  console.error('Variables d\'environnement manquantes pour les voix');
 }
 
 /**
  * Fonction principale pour générer la voix
  * @param text Le texte à convertir en voix
+ * @param character Le personnage sélectionné ('sasha' ou 'mael')
  * @returns URL de l'audio généré
  */
-export const generateVoice = async (text: string): Promise<string> => {
+export const generateVoice = async (text: string, character: string = DEFAULT_VOICE): Promise<string> => {
   try {
     logger.group('Génération de la voix');
     logger.info('Début de la génération pour le texte:', text);
@@ -62,8 +112,11 @@ export const generateVoice = async (text: string): Promise<string> => {
       const segmentSSML = generateSegmentSSML(segment, emotion, analysis, { pitch: basePitch, rate: baseRate });
       logger.debug('SSML pour le segment:', segmentSSML);
       
+      const voiceConfig = getVoiceConfig(character);
+      const apiUrl = getApiUrl(character);
+      
       const response = await axiosInstance.post(
-        API_URL,
+        apiUrl,
         {
           text: segmentSSML,
           model_id: "eleven_multilingual_v2",
@@ -71,7 +124,7 @@ export const generateVoice = async (text: string): Promise<string> => {
         },
         {
           headers: {
-            'xi-api-key': API_KEY,
+            'xi-api-key': voiceConfig.apiKey,
             'Content-Type': 'application/json',
             'Accept': 'audio/mpeg'
           },
@@ -105,9 +158,14 @@ export const generateVoice = async (text: string): Promise<string> => {
  * Fonction pour générer la voix avec des sons d'environnement
  * @param text Le texte à convertir en voix
  * @param useAI Indique si on doit utiliser l'IA pour ajouter des sons d'environnement
+ * @param character Le personnage sélectionné ('sasha' ou 'mael')
  * @returns URL de l'audio généré
  */
-export const generateVoiceWithEnvironment = async (text: string, useAI: boolean = false): Promise<string> => {
+export const generateVoiceWithEnvironment = async (
+  text: string, 
+  useAI: boolean = false, 
+  character: string = DEFAULT_VOICE
+): Promise<string> => {
   try {
     logger.group('Génération de la voix avec environnement');
     logger.info('Texte à traiter:', text);
@@ -232,9 +290,13 @@ export const generateVoiceWithEnvironment = async (text: string, useAI: boolean 
 
       try {
         logger.info(`Appel à l'API ElevenLabs pour le segment ${i+1}/${segmentsWithTiming.length}`);
+        // Récupérer la configuration de voix pour le personnage sélectionné
+        const voiceConfig = getVoiceConfig(character);
+        const apiUrl = getApiUrl(character);
+        
         // Générer l'audio pour ce segment
         const response = await axiosInstance.post(
-          API_URL,
+          apiUrl,
           {
             text: ssml,
             model_id: "eleven_multilingual_v2",
@@ -242,7 +304,7 @@ export const generateVoiceWithEnvironment = async (text: string, useAI: boolean 
           },
           {
             headers: {
-              'xi-api-key': API_KEY,
+              'xi-api-key': voiceConfig.apiKey,
               'Content-Type': 'application/json',
               'Accept': 'audio/mpeg'
             },
@@ -363,7 +425,7 @@ export const generateVoiceWithEnvironment = async (text: string, useAI: boolean 
     // En cas d'erreur, essayer de générer une voix simple sans environnement
     logger.info('Tentative de génération de voix simple sans environnement');
     try {
-      const simpleVoiceUrl = await generateVoice(text);
+      const simpleVoiceUrl = await generateVoice(text, character);
       logger.info('Génération de voix simple réussie');
       return simpleVoiceUrl;
     } catch (fallbackError) {

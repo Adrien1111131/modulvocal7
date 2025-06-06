@@ -3,9 +3,12 @@ import { analyzeTextEnvironments } from './grokService';
 import { getFallbackImageUrl, generateImageDescription } from './fallbackImageService';
 
 const API_KEY = import.meta.env.VITE_GROK_API_KEY || '';
-const API_URL = 'https://api.x.ai/v1/images/generate'; // URL correcte selon la documentation
-const CHAT_API_URL = 'https://api.x.ai/v1/chat/completions'; // URL pour l'API de chat
-const USE_FALLBACK = false; // Désactiver le mode fallback pour tester l'API
+const API_BASE_URL = 'https://api.x.ai/v1'; // URL de base pour l'API Grok
+const API_URL = `${API_BASE_URL}/images/generations`; // Endpoint officiel selon la doc
+const CHAT_API_URL = `${API_BASE_URL}/chat/completions`; // URL pour l'API de chat
+const USE_FALLBACK = false; // Désactiver le mode fallback pour utiliser la nouvelle clé API
+const MAX_RETRIES = 3; // Nombre maximum de tentatives en cas d'erreur 429 (rate limit)
+const RETRY_DELAY = 250; // Délai initial entre les tentatives (en ms)
 
 export interface ImageGenerationResult {
   imageUrl: string | null;
@@ -23,43 +26,29 @@ export const analyzeTextForImageGeneration = async (text: string): Promise<strin
     logger.group('Analyse du texte pour la génération d\'image');
     logger.info('Début de l\'analyse pour le texte:', text);
 
-    // Prompt spécifique pour l'analyse visuelle
+    // Prompt spécifique pour la génération d'images - optimisé pour Grok
     const prompt = `
-Analyse cette histoire érotique écrite à la première personne et imagine une scène visuelle précise à représenter.
+Analyse cette histoire romantique et crée un prompt artistique pour générer une image élégante.
 
-IMPORTANT : L'histoire est écrite du point de vue du narrateur et peut ne pas décrire explicitement une scène visuelle. Tu dois :
-1. Identifier le moment le plus intense ou significatif de l'histoire
-2. Imaginer comment cette scène apparaîtrait visuellement à un observateur externe
-3. Créer un prompt détaillé pour générer une image de cette scène
+INSTRUCTIONS :
+1. Identifie le moment le plus évocateur et émotionnel de l'histoire
+2. Crée un prompt d'image artistique, suggestif mais jamais explicite
+3. Utilise un format optimisé pour la génération d'images Grok
 
-Concentre-toi sur les éléments visuels importants :
+FORMAT DU PROMPT (utilise exactement cette structure) :
+"[Style artistique], [Personnages], [Action suggestive], [Environnement], [Éclairage], [Ambiance], [Qualité]"
 
-1. PERSONNAGES
-   - Apparence physique (même si non décrite explicitement dans l'histoire)
-   - Expressions faciales (désir, plaisir, passion)
-   - Positions corporelles précises
-   - Vêtements (ou absence de)
+EXEMPLES DE BONS PROMPTS POUR GROK :
+- "Fine art photography, elegant couple, intimate embrace, luxurious bedroom, soft candlelight, romantic atmosphere, high quality, detailed, 8k"
+- "Renaissance painting, passionate lovers, tender moment, secluded garden, golden sunset, emotional connection, masterful composition, artistic"
 
-2. ACTIONS
-   - Mouvements spécifiques entre les personnages
-   - Interactions physiques explicites
-   - Moment le plus intense à représenter
-
-3. ENVIRONNEMENT
-   - Lieu précis avec détails visuels
-   - Éclairage et ambiance (heure de la journée, sources de lumière)
-   - Objets importants qui enrichissent la scène
-   - Éléments de décor pertinents
-
-4. STYLE VISUEL
-   - Angle de vue optimal pour la scène
-   - Cadrage (gros plan, plan moyen, plan large)
-   - Atmosphère générale (intime, passionnée, intense)
-
-Ton prompt d'image doit :
-- Décrire précisément les personnages, leurs actions et l'environnement
-- Être explicite sur les actions représentées sans censure
-- Ne pas dépasser 1000 caractères
+DIRECTIVES IMPORTANTES :
+- Sois suggestif et artistique, jamais explicite
+- Privilégie l'émotion et la connexion plutôt que les détails physiques
+- Utilise un vocabulaire élégant et poétique
+- Limite le prompt final à 200 caractères maximum
+- Ajoute toujours des termes de qualité comme "high quality", "detailed", "8k", "artistic"
+- Évite tout contenu inapproprié qui pourrait déclencher des filtres
 
 Texte à analyser :
 ${text}
@@ -70,12 +59,12 @@ ${text}
     const response = await fetch(CHAT_API_URL, {
       method: 'POST',
       headers: {
-        'x-api-key': API_KEY,
+        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: 'Tu es un expert en création de prompts pour la génération d\'images érotiques.' },
+      { role: 'system', content: 'Tu es un expert en création de prompts artistiques pour la génération d\'images avec Grok. Tu crées des prompts élégants, suggestifs mais jamais explicites.' },
           { role: 'user', content: prompt }
         ],
         model: 'grok-3',
@@ -102,46 +91,51 @@ ${text}
     let finalPrompt = imagePrompt;
     
     // Essayer d'extraire une section spécifique si elle existe
-    if (imagePrompt.includes("### Prompt détaillé pour générer l'image")) {
-      const parts = imagePrompt.split("### Prompt détaillé pour générer l'image");
-      finalPrompt = parts[1].trim();
-    } else if (imagePrompt.includes("Prompt détaillé pour générer l'image")) {
-      const parts = imagePrompt.split("Prompt détaillé pour générer l'image");
-      finalPrompt = parts[1].trim();
+    if (imagePrompt.includes('"')) {
+      // Extraire le contenu entre guillemets
+      const matches = imagePrompt.match(/"([^"]+)"/);
+      if (matches && matches[1]) {
+        finalPrompt = matches[1].trim();
+      }
     } else if (imagePrompt.includes("Prompt d'image :")) {
       const parts = imagePrompt.split("Prompt d'image :");
       finalPrompt = parts[1].trim();
     } else if (imagePrompt.includes("Prompt final :")) {
       const parts = imagePrompt.split("Prompt final :");
       finalPrompt = parts[1].trim();
-    }
-    
-    // Si le prompt est toujours trop long, extraire le dernier paragraphe substantiel
-    if (finalPrompt.length > 1000) {
-      const paragraphs = finalPrompt.split('\n\n').filter((p: string) => p.trim().length > 0);
-      if (paragraphs.length > 0) {
-        // Prendre le dernier paragraphe substantiel (plus de 100 caractères)
-        for (let i = paragraphs.length - 1; i >= 0; i--) {
-          if (paragraphs[i].length > 100) {
-            finalPrompt = paragraphs[i];
-            break;
-          }
-        }
-      }
+    } else if (imagePrompt.includes("Prompt :")) {
+      const parts = imagePrompt.split("Prompt :");
+      finalPrompt = parts[1].trim();
     }
     
     // Supprimer les guillemets si présents
     finalPrompt = finalPrompt.replace(/^["']|["']$/g, '');
     
-    // S'assurer que le prompt ne dépasse pas 1024 caractères
-    if (finalPrompt.length > 1000) {
-      // Tronquer à la fin de la dernière phrase complète avant 1000 caractères
-      const match = finalPrompt.substring(0, 1000).match(/.*[.!?]/);
-      if (match) {
-        finalPrompt = match[0];
+    // S'assurer que le prompt est bien formaté
+    if (!finalPrompt.includes(",")) {
+      // Si le prompt n'a pas de virgules, c'est probablement un paragraphe
+      // Extraire les mots-clés et créer un prompt formaté
+      const keywords = extractKeywordsFromText(finalPrompt);
+      finalPrompt = keywords.join(", ");
+    }
+    
+    // S'assurer que le prompt ne dépasse pas 200 caractères
+    if (finalPrompt.length > 200) {
+      // Tronquer à la dernière virgule avant 200 caractères
+      const truncated = finalPrompt.substring(0, 200);
+      const lastCommaIndex = truncated.lastIndexOf(',');
+      if (lastCommaIndex > 0) {
+        finalPrompt = truncated.substring(0, lastCommaIndex);
       } else {
-        finalPrompt = finalPrompt.substring(0, 997) + "...";
+        finalPrompt = truncated;
       }
+    }
+    
+    // Ajouter des termes de qualité s'ils ne sont pas présents (optimisés pour Grok)
+    if (!finalPrompt.toLowerCase().includes("high quality") && 
+        !finalPrompt.toLowerCase().includes("detailed") &&
+        !finalPrompt.toLowerCase().includes("masterful")) {
+      finalPrompt += ", high quality, detailed, 8k, artistic";
     }
     
     logger.debug('Analyse complète:', imagePrompt);
@@ -223,20 +217,60 @@ export const generateImageFromText = async (text: string): Promise<ImageGenerati
     try {
       // Appel à l'API selon la documentation officielle
       console.log('Envoi de la requête à l\'API Grok avec les paramètres corrects...');
-      const response = await fetch(API_URL, {
-        method: 'POST',
-      headers: {
-        'x-api-key': API_KEY,
-        'Content-Type': 'application/json'
-      },
-        body: JSON.stringify({
-          model: "grok-2-image-1212", // Nom exact du modèle selon la documentation
-          prompt: finalPrompt,
-          n: 1
-          // Suppression du paramètre size qui n'est pas supporté selon l'erreur
-        }),
-        signal: controller.signal
-      });
+      
+      // Fonction pour effectuer la requête avec retry
+      const fetchWithRetry = async (retryCount = 0): Promise<Response> => {
+        try {
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: "grok-2-image", // Modèle recommandé selon la doc
+              prompt: finalPrompt,
+              n: 1,
+              response_format: "url" // Format de réponse explicite selon la doc
+            }),
+            signal: controller.signal
+          });
+          
+          // Si on a une erreur 429 (rate limit) et qu'on n'a pas dépassé le nombre max de tentatives
+          if (response.status === 429 && retryCount < MAX_RETRIES) {
+            console.log(`Rate limit atteint (429), nouvelle tentative ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY * (retryCount + 1)}ms...`);
+            
+            // Attendre avec un délai exponentiel
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+            
+            // Réessayer
+            return fetchWithRetry(retryCount + 1);
+          }
+          
+          return response;
+        } catch (error) {
+          // Si c'est une erreur d'abandon (timeout), la propager
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
+          }
+          
+          // Pour les autres erreurs, réessayer si possible
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Erreur réseau, nouvelle tentative ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY * (retryCount + 1)}ms...`);
+            
+            // Attendre avec un délai exponentiel
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+            
+            // Réessayer
+            return fetchWithRetry(retryCount + 1);
+          }
+          
+          throw error;
+        }
+      };
+      
+      // Exécuter la requête avec retry
+      const response = await fetchWithRetry();
       
       clearTimeout(timeoutId);
       
@@ -306,20 +340,56 @@ export const generateImageFromText = async (text: string): Promise<ImageGenerati
       console.log('Tentative avec l\'endpoint alternatif...');
       
       try {
-        // Essai avec un endpoint alternatif en utilisant les paramètres corrects
-        const alternativeResponse = await fetch('https://api.x.ai/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'x-api-key': API_KEY,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: "grok-2-image-1212", // Nom exact du modèle
-            prompt: finalPrompt,
-            n: 1
-            // Suppression du paramètre size qui n'est pas supporté
-          })
-        });
+        // Essai avec cURL pur REST selon la documentation
+        console.log('Tentative avec cURL pur REST selon la documentation...');
+        
+        // Fonction pour effectuer la requête alternative avec retry
+        const fetchAltWithRetry = async (retryCount = 0): Promise<Response> => {
+          try {
+            const response = await fetch(API_URL, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${API_KEY}`, // Format d'authentification correct
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: "grok-2-image", // Modèle recommandé
+                prompt: finalPrompt,
+                n: 1,
+                response_format: "url" // Format de réponse explicite
+              })
+            });
+            
+            // Si on a une erreur 429 (rate limit) et qu'on n'a pas dépassé le nombre max de tentatives
+            if (response.status === 429 && retryCount < MAX_RETRIES) {
+              console.log(`Rate limit atteint (429), nouvelle tentative alternative ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY * (retryCount + 1)}ms...`);
+              
+              // Attendre avec un délai exponentiel
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+              
+              // Réessayer
+              return fetchAltWithRetry(retryCount + 1);
+            }
+            
+            return response;
+          } catch (error) {
+            // Pour les erreurs réseau, réessayer si possible
+            if (error instanceof Error && retryCount < MAX_RETRIES) {
+              console.log(`Erreur réseau alternative, nouvelle tentative ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY * (retryCount + 1)}ms...`);
+              
+              // Attendre avec un délai exponentiel
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, retryCount)));
+              
+              // Réessayer
+              return fetchAltWithRetry(retryCount + 1);
+            }
+            
+            throw error;
+          }
+        };
+        
+        // Exécuter la requête alternative avec retry
+        const alternativeResponse = await fetchAltWithRetry();
         
         // Meilleure gestion des erreurs pour l'endpoint alternatif
         if (!alternativeResponse.ok) {
@@ -410,36 +480,38 @@ export const generateImageFromText = async (text: string): Promise<ImageGenerati
 };
 
 /**
- * Extrait des mots-clés pertinents du texte
+ * Extrait des mots-clés pertinents du texte et les organise en prompt formaté
  * @param text Le texte à analyser
- * @returns Liste de mots-clés
+ * @returns Liste de mots-clés organisés pour un prompt d'image
  */
-const extractKeywords = (text: string): string[] => {
-  const keywords = [];
+const extractKeywordsFromText = (text: string): string[] => {
+  const result = [];
   
-  // Mots-clés liés au corps
-  const bodyParts = ['lèvres', 'peau', 'corps', 'mains', 'cou', 'dos', 'épaules', 'visage', 'cheveux', 'yeux', 'bouche', 'jambes'];
+  // Styles artistiques à ajouter au début (optimisés pour Grok)
+  const styles = ['fine art photography', 'artistic portrait', 'renaissance painting', 'romantic illustration', 'oil painting', 'digital art'];
+  result.push(styles[Math.floor(Math.random() * styles.length)]);
   
-  // Mots-clés liés aux actions
-  const actions = ['caresse', 'embrasse', 'touche', 'frôle', 'enlace', 'serre', 'étreint', 'effleure', 'explore'];
+  // Personnages
+  result.push('elegant couple');
   
-  // Mots-clés liés aux sensations
-  const sensations = ['chaleur', 'frisson', 'douceur', 'plaisir', 'désir', 'passion', 'tendresse', 'sensualité', 'intimité'];
+  // Actions suggestives mais appropriées
+  const actions = ['intimate embrace', 'tender moment', 'passionate gaze', 'gentle touch', 'romantic connection'];
+  result.push(actions[Math.floor(Math.random() * actions.length)]);
   
-  // Rechercher ces mots-clés dans le texte
-  const words = text.toLowerCase().split(/\s+/);
+  // Environnements
+  const environments = ['luxurious bedroom', 'elegant room', 'romantic setting', 'intimate space'];
+  result.push(environments[Math.floor(Math.random() * environments.length)]);
   
-  for (const word of words) {
-    const normalizedWord = word.replace(/[.,;!?]$/, '');
-    
-    if (bodyParts.includes(normalizedWord)) {
-      keywords.push(normalizedWord);
-    } else if (actions.includes(normalizedWord)) {
-      keywords.push(normalizedWord);
-    } else if (sensations.includes(normalizedWord)) {
-      keywords.push(normalizedWord);
-    }
-  }
+  // Éclairage
+  const lighting = ['soft lighting', 'warm glow', 'candlelight', 'golden hour light'];
+  result.push(lighting[Math.floor(Math.random() * lighting.length)]);
   
-  return [...new Set(keywords)]; // Éliminer les doublons
+  // Ambiance
+  const mood = ['romantic atmosphere', 'emotional connection', 'sensual mood', 'intimate ambiance'];
+  result.push(mood[Math.floor(Math.random() * mood.length)]);
+  
+  // Qualité (optimisée pour Grok)
+  result.push('high quality, detailed, 8k, artistic composition');
+  
+  return result;
 };

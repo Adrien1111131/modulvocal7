@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+// import OpenAI from 'openai';
 import { config, logger } from '../config/development';
 
 const API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
@@ -10,10 +10,10 @@ if (!API_KEY) {
 }
 
 // Initialisation du client OpenAI
-const openai = new OpenAI({
-  apiKey: API_KEY,
-  dangerouslyAllowBrowser: true // Nécessaire pour l'utilisation côté client
-});
+// const openai = new OpenAI({
+//   apiKey: API_KEY,
+//   dangerouslyAllowBrowser: true // Nécessaire pour l'utilisation côté client
+// });
 
 export interface EnvironmentDetection {
   segment: string;
@@ -34,52 +34,25 @@ export const analyzeTextEnvironments = async (text: string): Promise<Environment
     logger.group('Analyse du texte avec OpenAI');
     logger.info('Début de l\'analyse pour le texte:', text);
 
-    const prompt = `
-    Analyse ce texte et identifie pour chaque paragraphe ou segment naturel :
-    1. L'environnement ou le cadre de la scène (ex: plage, forêt, chambre, etc.)
-    2. Les effets sonores qui correspondraient à cet environnement
-    3. Le ton émotionnel dominant (sensuel, intense, jouissance, murmure, etc.)
-    4. Le débit de parole recommandé (très lent, lent, modéré, rapide)
-    5. Le volume recommandé (doux, normal, fort)
-
-    Réponds au format JSON avec cette structure exacte :
-    [
+    // Fonction temporairement désactivée car le module OpenAI n'est pas installé
+    logger.warn('Fonction analyzeTextEnvironments désactivée temporairement');
+    
+    // Retourner un résultat par défaut
+    const defaultResult: EnvironmentDetection[] = [
       {
-        "segment": "texte du segment",
-        "environment": "nom de l'environnement",
-        "soundEffects": ["son1", "son2"],
-        "emotionalTone": "ton émotionnel",
-        "speechRate": "débit de parole",
-        "volume": "volume"
+        segment: text,
+        environment: "chambre",
+        soundEffects: ["bedroom_ambience.mp3", "sheets_rustling.mp3"],
+        emotionalTone: "sensuel",
+        speechRate: "modéré",
+        volume: "doux"
       }
-    ]
+    ];
 
-    N'inclus aucun autre texte dans ta réponse, seulement le JSON.
-    `;
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: 'Tu es un assistant spécialisé dans l\'analyse de textes érotiques pour la génération audio.' },
-        { role: 'user', content: prompt + '\n\nTexte à analyser:\n' + text }
-      ],
-      temperature: 0.7,
-      response_format: { type: 'json_object' }
-    });
-
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error('Réponse vide de l\'API OpenAI');
-    }
-
-    // Parsing de la réponse JSON
-    const parsedResponse = JSON.parse(content);
-    const results = parsedResponse.segments || parsedResponse;
-
-    logger.debug('Résultats de l\'analyse:', results);
+    logger.debug('Résultats de l\'analyse (par défaut):', defaultResult);
     logger.groupEnd();
 
-    return results;
+    return defaultResult;
   } catch (error) {
     logger.error('Erreur lors de l\'analyse du texte avec OpenAI:', error);
     throw new Error('Échec de l\'analyse du texte');
