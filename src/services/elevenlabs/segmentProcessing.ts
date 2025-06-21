@@ -96,7 +96,13 @@ export const calculateSegmentTiming = (
     
     // Mettre à jour le temps courant pour le prochain segment
     // On soustrait le crossfade pour que les segments se chevauchent légèrement
-    currentTime += totalDuration - defaultCrossfade;
+    // Mais on vérifie d'abord que le segment est assez long pour supporter un crossfade
+    if (totalDuration > defaultCrossfade * 2) {
+      currentTime += totalDuration - defaultCrossfade;
+    } else {
+      // Pour les segments courts, on ajoute un petit délai minimum au lieu de faire un crossfade
+      currentTime += totalDuration + 0.1; // 100ms de délai minimum
+    }
     
     return segmentWithTiming;
   });

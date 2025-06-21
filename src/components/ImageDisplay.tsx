@@ -115,20 +115,16 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       )}
       <style>{`
         .image-display-container {
-          margin-top: 1rem;
+          margin-top: 0;
           text-align: center;
           transition: all 0.3s ease;
-          background-color: #f8f9fa;
           border-radius: 8px;
-          padding: 1rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          padding: 0;
+          overflow: hidden;
         }
         
         .image-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.5rem;
+          display: none;
         }
         
         .image-title {
@@ -154,15 +150,15 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         .image-preview {
           position: relative;
           display: inline-block;
-          max-width: ${isExpanded ? '100%' : '300px'};
-          max-height: ${isExpanded ? 'none' : '200px'};
+          width: 100%;
+          max-width: 100%;
+          max-height: ${isExpanded ? 'none' : '300px'};
           overflow: hidden;
           border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
           cursor: pointer;
           transition: all 0.3s ease;
-          opacity: 0.85;
-          margin: 0.5rem 0;
+          opacity: 0.95;
+          margin: 0;
         }
         
         .iframe-container {
@@ -191,10 +187,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         }
         
         .image-prompt {
-          margin-top: 0.5rem;
-          text-align: left;
-          font-size: 0.9rem;
-          color: #666;
+          display: none;
         }
         
         .image-prompt details {

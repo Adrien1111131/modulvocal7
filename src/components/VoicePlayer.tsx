@@ -212,60 +212,96 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   };
 
   return (
-    <div className="voice-player">
+    <div className="spotify-player">
       {audioUrl ? (
-        <div>
-          <audio 
-            ref={audioRef} 
-            src={audioUrl}
-            controls
-            style={{ width: '100%', marginBottom: '1rem' }}
-          />
-          <div className="progress-container">
-            <span className="time">{formatTime(currentTime)}</span>
-            <input
-              type="range"
-              min="0"
-              max={duration}
-              value={currentTime}
-              onChange={handleSeek}
-              className="progress-slider"
-            />
-            <span className="time">{formatTime(duration)}</span>
-          </div>
-          <div className="volume-container">
-            <span className="volume-label">Volume:</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={volume}
-              onChange={handleVolumeChange}
-              className="volume-slider"
-            />
-          </div>
-          <div className="player-info">
-            <span className="environment-display">Environnement: {environment}</span>
-            <span className="emotion-display">Émotion: {emotion}</span>
-          </div>
-          
-          {/* Section d'image améliorée */}
-          <div className="player-image-section">
-            <h3 className="image-section-title">Illustration générée</h3>
+        <div className="player-container">
+          {/* Section d'image principale */}
+          <div className="player-image-main">
             {isGeneratingImage ? (
               <div className="image-loading">
                 <div className="spinner"></div>
                 <p>Génération de l'illustration en cours...</p>
               </div>
             ) : (
-              <ImageDisplay 
-                imageUrl={imageUrl} 
-                prompt={imagePrompt} 
-                error={imageError}
-                onRegenerateClick={handleRegenerateImage}
-              />
+              <div className="image-with-controls">
+                <ImageDisplay 
+                  imageUrl={imageUrl} 
+                  prompt={imagePrompt} 
+                  error={imageError}
+                  onRegenerateClick={handleRegenerateImage}
+                />
+                {/* Bouton play/pause superposé sur l'image */}
+                <button 
+                  className={`play-button-overlay ${isPlaying ? 'playing' : ''}`}
+                  onClick={isPlaying ? handlePause : handlePlay}
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  <div className="play-icon">
+                    {isPlaying ? (
+                      <svg viewBox="0 0 24 24" width="100%" height="100%">
+                        <rect x="6" y="4" width="4" height="16" fill="currentColor" />
+                        <rect x="14" y="4" width="4" height="16" fill="currentColor" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="100%" height="100%">
+                        <path d="M8 5v14l11-7z" fill="currentColor" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              </div>
             )}
+          </div>
+          
+          {/* Contrôles audio cachés pour la fonctionnalité */}
+          <audio 
+            ref={audioRef} 
+            src={audioUrl}
+            style={{ display: 'none' }}
+          />
+          
+          {/* Barre de progression style Spotify */}
+          <div className="spotify-progress-container">
+            <span className="time">{formatTime(currentTime)}</span>
+            <div className="progress-bar-wrapper">
+              <input
+                type="range"
+                min="0"
+                max={duration}
+                value={currentTime}
+                onChange={handleSeek}
+                className="spotify-progress-slider"
+              />
+              <div 
+                className="progress-bar-fill" 
+                style={{ width: `${(currentTime / duration) * 100}%` }}
+              ></div>
+            </div>
+            <span className="time">{formatTime(duration)}</span>
+          </div>
+          
+          {/* Contrôles supplémentaires */}
+          <div className="player-controls-row">
+            <div className="volume-container">
+              <span className="volume-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" fill="currentColor" />
+                </svg>
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={handleVolumeChange}
+                className="spotify-volume-slider"
+              />
+            </div>
+            <div className="player-info">
+              <span className="environment-display">Environnement: {environment}</span>
+              <span className="emotion-display">Émotion: {emotion}</span>
+            </div>
           </div>
         </div>
       ) : (
@@ -273,151 +309,211 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
       )}
       <style>
         {`
-          .voice-player {
-            background: #f8f9fa;
+          .spotify-player {
+            background: linear-gradient(135deg, #1e2a3b, #121212);
             padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            color: #fff;
+            max-width: 600px;
+            margin: 0 auto;
           }
-
-          .player-controls {
+          
+          .player-container {
             display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            flex-direction: column;
+            gap: 1.5rem;
           }
-
-          .player-button {
-            padding: 0.5rem 1rem;
+          
+          .player-image-main {
+            position: relative;
+            width: 100%;
+            margin: 0 auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+          }
+          
+          .image-with-controls {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+          
+          .image-with-controls img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.3s ease;
+          }
+          
+          .play-button-overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #1DB954;
             border: none;
-            border-radius: 4px;
-            background: #007bff;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.2s;
-          }
-
-          .player-button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-          }
-
-          .player-button:not(:disabled):hover {
-            background: #0056b3;
-          }
-
-          .progress-container {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s ease-in-out;
+            z-index: 10;
           }
-
-          .progress-slider {
+          
+          .play-button-overlay:hover {
+            transform: scale(1.1);
+            background: #1ed760;
+          }
+          
+          .play-button-overlay.playing {
+            background: #ffffff;
+            color: #121212;
+          }
+          
+          .play-icon {
+            width: 24px;
+            height: 24px;
+          }
+          
+          .spotify-progress-container {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin: 0.5rem 0;
+          }
+          
+          .progress-bar-wrapper {
+            position: relative;
             flex: 1;
             height: 4px;
-            -webkit-appearance: none;
-            background: #ddd;
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
-            outline: none;
           }
-
-          .progress-slider::-webkit-slider-thumb {
+          
+          .spotify-progress-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            -webkit-appearance: none;
+            background: transparent;
+            margin: 0;
+            z-index: 2;
+            cursor: pointer;
+          }
+          
+          .spotify-progress-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 12px;
             height: 12px;
-            background: #007bff;
+            background: #fff;
             border-radius: 50%;
             cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
           }
-
+          
+          .progress-bar-wrapper:hover .spotify-progress-slider::-webkit-slider-thumb {
+            opacity: 1;
+          }
+          
+          .progress-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: #1DB954;
+            border-radius: 2px;
+            z-index: 1;
+            pointer-events: none;
+          }
+          
+          .time {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            min-width: 3.5ch;
+          }
+          
+          .player-controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          
           .volume-container {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 0.5rem;
           }
-
-          .volume-slider {
-            width: 100px;
+          
+          .volume-icon {
+            color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            align-items: center;
+          }
+          
+          .spotify-volume-slider {
+            width: 80px;
             height: 4px;
             -webkit-appearance: none;
-            background: #ddd;
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
             outline: none;
           }
-
-          .volume-slider::-webkit-slider-thumb {
+          
+          .spotify-volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 12px;
-            height: 12px;
-            background: #007bff;
+            width: 10px;
+            height: 10px;
+            background: #fff;
             border-radius: 50%;
             cursor: pointer;
           }
-
-          .time {
-            font-family: monospace;
-            min-width: 4ch;
-          }
-
-          .volume-label {
-            min-width: 60px;
-          }
-
+          
           .player-info {
-            margin-top: 1rem;
-            padding: 0.8rem;
-            background-color: #f0f8ff;
-            border-radius: 6px;
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 1rem;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
           }
-
+          
           .environment-display {
             font-style: italic;
-            color: #666;
           }
-
+          
           .emotion-display {
-            color: #ff69b4;
+            color: #1DB954;
             font-weight: bold;
-          }
-          
-          .player-image-section {
-            margin-top: 1.5rem;
-            border-top: 1px solid #eee;
-            padding-top: 1rem;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            padding: 1rem;
-          }
-          
-          .image-section-title {
-            margin-top: 0;
-            margin-bottom: 1rem;
-            color: #333;
-            font-size: 1.2rem;
-            text-align: center;
           }
           
           .image-loading {
             text-align: center;
-            color: #666;
+            color: rgba(255, 255, 255, 0.7);
             font-style: italic;
-            padding: 2rem;
+            padding: 4rem 2rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
           }
           
           .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            border-left-color: #007bff;
+            border-left-color: #1DB954;
             animation: spin 1s linear infinite;
             margin-bottom: 1rem;
           }

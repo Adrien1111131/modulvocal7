@@ -203,11 +203,16 @@ class AudioMixerService {
         
         // Calculer les paramètres de crossfade
         const nextSegment = i < segments.length - 1 ? segments[i + 1] : null;
-        const crossfadeOut = nextSegment ? 
+        // N'appliquer le crossfade que si le segment est suffisamment long (au moins 2x la durée du crossfade)
+        const crossfadeOut = nextSegment && segment.duration > defaultCrossfadeDuration * 2 ? 
           Math.min(defaultCrossfadeDuration, (segment.duration * 0.2)) : 0;
         
         const fadeIn = segment.fadeIn || 0.1;
-        const fadeOut = segment.fadeOut || crossfadeOut;
+        // Limiter le fadeOut à maximum 50% de la durée du segment
+        let fadeOut = segment.fadeOut || crossfadeOut;
+        if (fadeOut > segment.duration * 0.5) {
+          fadeOut = segment.duration * 0.5;
+        }
         
         logger.debug('Paramètres de fondu:', { fadeIn, fadeOut });
         
