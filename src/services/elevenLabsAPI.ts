@@ -262,14 +262,83 @@ export const generateVoiceWithEnvironment = async (
         
         // Ajuster le SSML avec les paramètres de vitesse et de hauteur
         if (segment.elevenlabsParams.speed || segment.elevenlabsParams.pitch_shift) {
-          const speed = segment.elevenlabsParams.speed || '35%';
-          const pitch = segment.elevenlabsParams.pitch_shift ? 
-                      (segment.elevenlabsParams.pitch_shift > 0 ? `+${segment.elevenlabsParams.pitch_shift}%` : `${segment.elevenlabsParams.pitch_shift}%`) : 
-                      '-5%';
+          // Déterminer la vitesse en fonction du contexte émotionnel avec limites
+          let speed = segment.elevenlabsParams.speed || '35%';
           
-          // Remplacer la balise prosody existante
-          ssml = ssml.replace(/<prosody[^>]*>/i, `<prosody rate="${speed}" pitch="${pitch}">`);
-          logger.debug('SSML ajusté avec les paramètres Grok:', ssml);
+          // Ajuster la vitesse en fonction de l'intensité émotionnelle avec limites maximales
+          if (segment.emotionalTone === 'jouissance') {
+            // Pour la jouissance, parler plus rapidement mais pas trop
+            speed = '45%'; // Limité à 45% au lieu de 55%
+          } else if (segment.emotionalTone === 'excite') {
+            // Pour l'excitation, parler un peu plus rapidement
+            speed = '40%'; // Limité à 40% au lieu de 45%
+          } else if (segment.emotionalTone === 'murmure') {
+            // Pour les murmures, parler plus lentement
+            speed = '25%';
+          } else if (segment.emotionalTone === 'sensuel') {
+            // Pour le ton sensuel, parler lentement
+            speed = '30%';
+          } else if (segment.emotionalTone === 'intense') {
+            // Pour le ton intense, parler à vitesse modérée
+            speed = '38%';
+          }
+          
+          // Utiliser la vitesse spécifiée par Grok si disponible, mais avec limite maximale
+          if (segment.elevenlabsParams.speed) {
+            // Extraire la valeur numérique de la vitesse
+            const speedValue = parseInt(segment.elevenlabsParams.speed.replace('%', ''), 10);
+            // Limiter à 45% maximum
+            const limitedSpeed = Math.min(speedValue, 45);
+            speed = `${limitedSpeed}%`;
+          }
+          
+          // Ajuster le pitch en fonction de l'émotion avec plus de nuances
+          let pitch;
+          if (segment.elevenlabsParams.pitch_shift) {
+            pitch = segment.elevenlabsParams.pitch_shift > 0 ? 
+                  `+${segment.elevenlabsParams.pitch_shift}%` : 
+                  `${segment.elevenlabsParams.pitch_shift}%`;
+          } else {
+            // Valeurs par défaut selon l'émotion
+            if (segment.emotionalTone === 'jouissance') {
+              pitch = '+8%';
+            } else if (segment.emotionalTone === 'excite') {
+              pitch = '+3%';
+            } else if (segment.emotionalTone === 'murmure') {
+              pitch = '-18%';
+            } else if (segment.emotionalTone === 'sensuel') {
+              pitch = '-12%';
+            } else if (segment.emotionalTone === 'intense') {
+              pitch = '+0%';
+            } else {
+              pitch = '-5%';
+            }
+          }
+          
+          // Ajouter des variations de volume en fonction de l'émotion
+          let volume;
+          if (segment.emotionalTone === 'murmure') {
+            volume = 'soft';
+          } else if (segment.emotionalTone === 'jouissance') {
+            volume = 'loud';
+          } else if (segment.emotionalTone === 'excite') {
+            volume = 'medium-loud';
+          } else if (segment.emotionalTone === 'sensuel') {
+            volume = 'medium-soft';
+          } else {
+            volume = 'medium';
+          }
+          
+          // Remplacer la balise prosody existante avec plus de paramètres
+          ssml = ssml.replace(/<prosody[^>]*>/i, `<prosody rate="${speed}" pitch="${pitch}" volume="${volume}">`);
+          
+          // Ajouter des balises SSML avancées pour l'ensemble du segment
+          ssml = ssml.replace(/<speak>/i, 
+            `<speak><amazon:auto-breaths frequency="medium" volume="x-soft" duration="medium">`);
+          ssml = ssml.replace(/<\/speak>/i, 
+            `</amazon:auto-breaths></speak>`);
+          
+          logger.debug('SSML enrichi avec paramètres avancés:', ssml);
         }
         
         // Les onomatopées sont maintenant traitées naturellement par le TTS

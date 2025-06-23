@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TextInput from './components/TextInput';
 import VoicePlayer from './components/VoicePlayer';
+import LoadingAnimation from './components/LoadingAnimation';
 import { generateVoiceWithEnvironment } from './services/elevenLabsAPI';
 import { analyzeTextEnvironments } from './services/grokService';
 import { logger } from './config/development';
@@ -320,11 +321,9 @@ Je ne peux plus résister, l'intensité me submerge complètement !`;
             {isLoading ? 'Génération en cours...' : 'Générer la Voix'}
           </button>
           
-          {/* Message de statut */}
+          {/* Animation de chargement */}
           {isLoading && (
-            <div className="status-message">
-              Génération de la voix en cours...
-            </div>
+            <LoadingAnimation />
           )}
           
           {error && (

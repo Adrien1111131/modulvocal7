@@ -26,6 +26,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   const [imagePrompt, setImagePrompt] = useState<string>('');
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const [imageError, setImageError] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     console.log('VoicePlayer - useEffect [audioUrl]', { audioUrl });
@@ -46,6 +47,8 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
         if (audioRef.current) {
           audioRef.current.controls = true;
         }
+        // Indiquer que l'audio est chargé
+        setIsLoading(false);
       };
       
       audioRef.current.addEventListener('error', handleError as any);
@@ -212,96 +215,46 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   };
 
   return (
-    <div className="spotify-player">
+    <div className="voice-player">
       {audioUrl ? (
-        <div className="player-container">
-          {/* Section d'image principale */}
-          <div className="player-image-main">
+        <div>
+          {isLoading && (
+            <div className="hearts-loading">
+              <div className="heart heart1"></div>
+              <div className="heart heart2"></div>
+              <div className="heart heart3"></div>
+              <div className="heart heart4"></div>
+              <div className="heart heart5"></div>
+              <div className="loading-text">Chargement de l'audio...</div>
+            </div>
+          )}
+          <audio 
+            ref={audioRef} 
+            src={audioUrl}
+            controls
+            style={{ width: '100%', marginBottom: '1rem' }}
+          />
+          <div className="player-info">
+            <span className="environment-display">Environnement: {environment}</span>
+            <span className="emotion-display">Émotion: {emotion}</span>
+          </div>
+          
+          {/* Section d'image améliorée */}
+          <div className="player-image-section">
+            <h3 className="image-section-title">Illustration générée</h3>
             {isGeneratingImage ? (
               <div className="image-loading">
                 <div className="spinner"></div>
                 <p>Génération de l'illustration en cours...</p>
               </div>
             ) : (
-              <div className="image-with-controls">
-                <ImageDisplay 
-                  imageUrl={imageUrl} 
-                  prompt={imagePrompt} 
-                  error={imageError}
-                  onRegenerateClick={handleRegenerateImage}
-                />
-                {/* Bouton play/pause superposé sur l'image */}
-                <button 
-                  className={`play-button-overlay ${isPlaying ? 'playing' : ''}`}
-                  onClick={isPlaying ? handlePause : handlePlay}
-                  aria-label={isPlaying ? "Pause" : "Play"}
-                >
-                  <div className="play-icon">
-                    {isPlaying ? (
-                      <svg viewBox="0 0 24 24" width="100%" height="100%">
-                        <rect x="6" y="4" width="4" height="16" fill="currentColor" />
-                        <rect x="14" y="4" width="4" height="16" fill="currentColor" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="100%" height="100%">
-                        <path d="M8 5v14l11-7z" fill="currentColor" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              </div>
+              <ImageDisplay 
+                imageUrl={imageUrl} 
+                prompt={imagePrompt} 
+                error={imageError}
+                onRegenerateClick={handleRegenerateImage}
+              />
             )}
-          </div>
-          
-          {/* Contrôles audio cachés pour la fonctionnalité */}
-          <audio 
-            ref={audioRef} 
-            src={audioUrl}
-            style={{ display: 'none' }}
-          />
-          
-          {/* Barre de progression style Spotify */}
-          <div className="spotify-progress-container">
-            <span className="time">{formatTime(currentTime)}</span>
-            <div className="progress-bar-wrapper">
-              <input
-                type="range"
-                min="0"
-                max={duration}
-                value={currentTime}
-                onChange={handleSeek}
-                className="spotify-progress-slider"
-              />
-              <div 
-                className="progress-bar-fill" 
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              ></div>
-            </div>
-            <span className="time">{formatTime(duration)}</span>
-          </div>
-          
-          {/* Contrôles supplémentaires */}
-          <div className="player-controls-row">
-            <div className="volume-container">
-              <span className="volume-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" fill="currentColor" />
-                </svg>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={volume}
-                onChange={handleVolumeChange}
-                className="spotify-volume-slider"
-              />
-            </div>
-            <div className="player-info">
-              <span className="environment-display">Environnement: {environment}</span>
-              <span className="emotion-display">Émotion: {emotion}</span>
-            </div>
           </div>
         </div>
       ) : (
@@ -309,7 +262,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
       )}
       <style>
         {`
-          .spotify-player {
+          .voice-player {
             background: linear-gradient(135deg, #1e2a3b, #121212);
             padding: 1.5rem;
             border-radius: 12px;
@@ -318,200 +271,150 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
             max-width: 600px;
             margin: 0 auto;
           }
-          
-          .player-container {
+
+          .player-controls {
             display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
+            gap: 1rem;
+            margin-bottom: 1rem;
           }
-          
-          .player-image-main {
-            position: relative;
-            width: 100%;
-            margin: 0 auto;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-          }
-          
-          .image-with-controls {
-            position: relative;
-            width: 100%;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          
-          .image-with-controls img {
-            width: 100%;
-            height: auto;
-            display: block;
-            transition: transform 0.3s ease;
-          }
-          
-          .play-button-overlay {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: #1DB954;
+
+          .player-button {
+            padding: 0.5rem 1rem;
             border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            transition: all 0.2s ease-in-out;
-            z-index: 10;
-          }
-          
-          .play-button-overlay:hover {
-            transform: scale(1.1);
-            background: #1ed760;
-          }
-          
-          .play-button-overlay.playing {
-            background: #ffffff;
-            color: #121212;
-          }
-          
-          .play-icon {
-            width: 24px;
-            height: 24px;
-          }
-          
-          .spotify-progress-container {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            margin: 0.5rem 0;
-          }
-          
-          .progress-bar-wrapper {
-            position: relative;
-            flex: 1;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
-          }
-          
-          .spotify-progress-slider {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            -webkit-appearance: none;
-            background: transparent;
-            margin: 0;
-            z-index: 2;
-            cursor: pointer;
-          }
-          
-          .spotify-progress-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 12px;
-            height: 12px;
-            background: #fff;
-            border-radius: 50%;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.2s;
-          }
-          
-          .progress-bar-wrapper:hover .spotify-progress-slider::-webkit-slider-thumb {
-            opacity: 1;
-          }
-          
-          .progress-bar-fill {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
+            border-radius: 4px;
             background: #1DB954;
-            border-radius: 2px;
-            z-index: 1;
-            pointer-events: none;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
           }
-          
-          .time {
-            font-family: 'Courier New', monospace;
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.7);
-            min-width: 3.5ch;
+
+          .player-button:disabled {
+            background: #333;
+            cursor: not-allowed;
           }
-          
-          .player-controls-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+
+          .player-button:not(:disabled):hover {
+            background: #1ed760;
+            transform: scale(1.05);
           }
-          
-          .volume-container {
+
+          .progress-container {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 1rem;
+            margin-bottom: 1rem;
           }
-          
-          .volume-icon {
-            color: rgba(255, 255, 255, 0.7);
-            display: flex;
-            align-items: center;
-          }
-          
-          .spotify-volume-slider {
-            width: 80px;
+
+          .progress-slider {
+            flex: 1;
             height: 4px;
             -webkit-appearance: none;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
             outline: none;
           }
-          
-          .spotify-volume-slider::-webkit-slider-thumb {
+
+          .progress-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 10px;
-            height: 10px;
-            background: #fff;
+            width: 12px;
+            height: 12px;
+            background: #1DB954;
             border-radius: 50%;
             cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
           }
-          
-          .player-info {
+
+          .volume-container {
             display: flex;
+            align-items: center;
             gap: 1rem;
+            margin-bottom: 1rem;
+          }
+
+          .volume-slider {
+            width: 100px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+          }
+
+          .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #1DB954;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          .time {
+            font-family: 'Courier New', monospace;
+            min-width: 4ch;
+            color: rgba(255, 255, 255, 0.7);
             font-size: 0.8rem;
+          }
+
+          .volume-label {
+            min-width: 60px;
             color: rgba(255, 255, 255, 0.7);
           }
-          
+
+          .player-info {
+            margin-top: 1rem;
+            padding: 0.8rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+          }
+
           .environment-display {
             font-style: italic;
+            color: rgba(255, 255, 255, 0.7);
           }
-          
+
           .emotion-display {
             color: #1DB954;
             font-weight: bold;
+          }
+          
+          .player-image-section {
+            margin-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 1rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          }
+          
+          .image-section-title {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #fff;
+            font-size: 1.2rem;
+            text-align: center;
           }
           
           .image-loading {
             text-align: center;
             color: rgba(255, 255, 255, 0.7);
             font-style: italic;
-            padding: 4rem 2rem;
+            padding: 2rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
           }
           
           .spinner {
             border: 4px solid rgba(255, 255, 255, 0.1);
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             border-left-color: #1DB954;
             animation: spin 1s linear infinite;
@@ -521,6 +424,131 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+          
+          /* Animation des cœurs */
+          .hearts-loading {
+            position: relative;
+            height: 80px;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+          }
+          
+          .loading-text {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+          }
+          
+          .heart {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ff69b4;
+            transform: rotate(45deg);
+            opacity: 0;
+            z-index: 1;
+          }
+          
+          .heart:before,
+          .heart:after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            background: #ff69b4;
+            border-radius: 50%;
+            position: absolute;
+          }
+          
+          .heart:before {
+            top: -10px;
+            left: 0;
+          }
+          
+          .heart:after {
+            top: 0;
+            left: -10px;
+          }
+          
+          .heart1 {
+            left: 20%;
+            animation: float-heart 3s ease-in-out infinite;
+            animation-delay: 0s;
+          }
+          
+          .heart2 {
+            left: 35%;
+            animation: float-heart 3s ease-in-out infinite;
+            animation-delay: 0.5s;
+          }
+          
+          .heart3 {
+            left: 50%;
+            animation: float-heart 3s ease-in-out infinite;
+            animation-delay: 1s;
+          }
+          
+          .heart4 {
+            left: 65%;
+            animation: float-heart 3s ease-in-out infinite;
+            animation-delay: 1.5s;
+          }
+          
+          .heart5 {
+            left: 80%;
+            animation: float-heart 3s ease-in-out infinite;
+            animation-delay: 2s;
+          }
+          
+          @keyframes float-heart {
+            0% {
+              transform: rotate(45deg) translateY(50px);
+              opacity: 0;
+              scale: 0.3;
+            }
+            20% {
+              opacity: 0.8;
+              scale: 0.6;
+            }
+            80% {
+              opacity: 0.6;
+              scale: 0.8;
+            }
+            100% {
+              transform: rotate(45deg) translateY(-50px);
+              opacity: 0;
+              scale: 0.3;
+            }
+          }
+
+          /* Style pour l'élément audio natif */
+          audio {
+            width: 100%;
+            height: 40px;
+            border-radius: 30px;
+            background-color: rgba(255, 255, 255, 0.1);
+            margin-bottom: 1rem;
+          }
+
+          audio::-webkit-media-controls-panel {
+            background-color: rgba(29, 185, 84, 0.1);
+          }
+
+          audio::-webkit-media-controls-play-button {
+            background-color: #1DB954;
+            border-radius: 50%;
+          }
+
+          audio::-webkit-media-controls-current-time-display,
+          audio::-webkit-media-controls-time-remaining-display {
+            color: #000000;
+            font-weight: bold;
+            text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
           }
         `}
       </style>

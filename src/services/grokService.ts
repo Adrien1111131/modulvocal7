@@ -135,62 +135,83 @@ export const analyzeTextWithGrok = async (text: string): Promise<EnhancedSegment
     logger.group('Analyse du texte avec Grok');
     logger.info('Début de l\'analyse pour le texte:', text);
 
-    // Prompt détaillé pour Grok
+    // Prompt détaillé pour Grok avec analyse contextuelle améliorée
     const prompt = `
-Analyse ce texte érotique en détail. Pour chaque segment naturel du texte, identifie :
+Analyse ce texte érotique en détail, en tenant compte qu'il s'agit généralement d'un récit à la première personne décrivant une expérience sensuelle ou sexuelle. Divise le texte en segments naturels et analyse chaque segment en fonction de sa progression émotionnelle et de son contexte narratif.
 
-1. CARACTÉRISTIQUES VOCALES
-- Intensité émotionnelle (0-100%)
-- Type de voix :
-  * Murmure/Chuchotement
-  * Voix normale
-  * Gémissement
-  * Cri de plaisir
-- Rythme de parole :
-  * Très lent (passion intense)
-  * Lent (sensuel)
-  * Normal (narratif)
-  * Rapide (excitation)
-- Variations de hauteur :
-  * Plus grave (-20% à 0%)
-  * Normal (0%)
-  * Plus aigu (0% à +20%)
+IMPORTANT: Identifie précisément les phases émotionnelles (début de l'excitation, montée du désir, plateau, orgasme, résolution) et adapte les paramètres vocaux en conséquence.
 
-2. EXPRESSIONS ET ONOMATOPÉES
-- Respirations :
-  * Légères
-  * Profondes
-  * Haletantes
-- Sons spécifiques :
-  * "mmmh"
-  * "ahhh"
-  * "ohhh"
-  * Gémissements
-- Durée des sons (en ms)
+Pour chaque segment naturel du texte, identifie avec précision :
 
-3. PARAMÈTRES ELEVENLABS
+1. CARACTÉRISTIQUES VOCALES ET PROGRESSION ÉMOTIONNELLE
+- Intensité émotionnelle (0-100%) :
+  * 0-30% : début d'excitation, sensualité douce
+  * 30-60% : excitation modérée, désir croissant
+  * 60-85% : forte excitation, tension sexuelle élevée
+  * 85-100% : orgasme, jouissance intense
+- Type de voix (adapté au contexte narratif) :
+  * Murmure/Chuchotement (moments intimes, confidences, début de l'excitation)
+  * Voix normale (narration, description)
+  * Gémissement (plaisir croissant, excitation)
+  * Cri de plaisir (orgasme, jouissance)
+- Rythme de parole (varie selon l'intensité) :
+  * Très lent (20-30%) : moments sensuels intenses, murmures intimes
+  * Lent (30-40%) : description sensuelle, tension montante
+  * Modéré (40-50%) : narration normale
+  * Rapide (50-70%) : excitation intense, orgasme
+- Variations de hauteur (pitch) :
+  * Plus grave (-20% à -5%) : voix sensuelle, murmures
+  * Normal (-5% à +5%) : narration standard
+  * Plus aigu (+5% à +20%) : excitation intense, cris de plaisir
+
+2. EXPRESSIONS ET ONOMATOPÉES (selon le contexte narratif)
+- Respirations (adaptées à l'intensité) :
+  * Légères : début d'excitation
+  * Profondes : tension sexuelle, anticipation
+  * Haletantes : proche de l'orgasme, jouissance
+- Sons spécifiques (à insérer naturellement) :
+  * "mmmh" : appréciation, plaisir doux
+  * "ahhh" : surprise plaisante, plaisir
+  * "ohhh" : intensité, réalisation
+  * Gémissements : plaisir intense
+- Durée des sons (en ms, selon l'intensité)
+
+3. PARAMÈTRES ELEVENLABS (ajustés précisément)
 - stability (0.0-1.0) :
-  * 0.1-0.3 pour forte émotion
-  * 0.4-0.6 pour passion modérée
-  * 0.7-1.0 pour voix stable
+  * 0.1-0.2 : orgasme, jouissance extrême
+  * 0.2-0.3 : forte excitation, gémissements
+  * 0.4-0.6 : excitation modérée, tension
+  * 0.7-1.0 : narration, description, murmures contrôlés
 - similarity_boost (0.0-1.0) :
-  * 0.8-1.0 pour expressions intenses
-  * 0.5-0.7 pour ton normal
-  * 0.3-0.4 pour murmures
+  * 0.9-1.0 : orgasme, cris de plaisir
+  * 0.7-0.9 : excitation, gémissements
+  * 0.5-0.7 : narration avec émotion
+  * 0.3-0.5 : murmures, chuchotements
+- speed (ajusté au contexte) :
+  * "20%" à "30%" : très lent, sensuel intense
+  * "30%" à "40%" : lent, sensuel
+  * "40%" à "50%" : modéré, narratif
+  * "50%" à "70%" : rapide, excitation intense, orgasme
 
-4. ENVIRONNEMENT
-- Lieu décrit (chambre, plage, etc.)
-- Ambiance sonore suggérée
+4. ENVIRONNEMENT ET CONTEXTE NARRATIF
+- Lieu précis décrit dans le texte (chambre, plage, douche, etc.)
+- Ambiance sonore suggérée par le contexte
 - Correspondance avec les sons disponibles :
-  * mid-nights-sound-291477.mp3 (ambiance nuit)
-  * ocean-waves-112906.mp3 (vagues)
-  * forest-ambience-296528.mp3 (forêt)
-  * city-ambience-9270.mp3 (ville)
+  * mid-nights-sound-291477.mp3 (ambiance nuit, chambre)
+  * ocean-waves-112906.mp3 (plage, mer)
+  * forest-ambience-296528.mp3 (extérieur, nature)
+  * city-ambience-9270.mp3 (environnement urbain)
 
-Retourne au format JSON :
+5. MARQUEURS LINGUISTIQUES À DÉTECTER
+- Points d'exclamation : intensité émotionnelle accrue
+- Répétitions : insistance, intensité
+- Points de suspension : tension, anticipation
+- Onomatopées explicites : traduire en paramètres vocaux
+
+Retourne au format JSON précis :
 {
   "segments": [{
-    "text": "texte",
+    "text": "texte du segment",
     "vocal": {
       "intensity": 85,
       "type": "gémissement",
@@ -204,7 +225,8 @@ Retourne au format JSON :
     },
     "elevenlabs": {
       "stability": 0.2,
-      "similarity_boost": 0.9
+      "similarity_boost": 0.9,
+      "speed": "35%"
     },
     "environment": {
       "type": "chambre",
@@ -213,7 +235,7 @@ Retourne au format JSON :
   }]
 }
 
-Analyse uniquement le texte suivant :
+Analyse uniquement le texte suivant, en identifiant avec précision les variations d'intensité émotionnelle et en adaptant tous les paramètres en conséquence :
 ${text}
 `;
 

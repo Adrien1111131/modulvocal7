@@ -11,13 +11,13 @@ export const emotionKeywords = {
   doux: ['tendre', 'doux', 'délicat', 'léger', 'suave', 'douceur']
 };
 
-// Patterns de prosodie pour les différentes ambiances émotionnelles
+// Patterns de prosodie pour les différentes ambiances émotionnelles avec limites de vitesse
 export const contextualMoodPatterns: Record<Exclude<ContextualMoodType, 'neutral'>, ContextualMoodPattern> = {
-  anticipation: { pitch: '+5%', rate: '55%' },   // Ralenti pour plus de tension
-  tension: { pitch: '+10%', rate: '65%' },       // Ralenti pour plus d'impact
-  relaxation: { pitch: '-5%', rate: '50%' },     // Très lent pour la détente
-  intimacy: { pitch: '-10%', rate: '45%' },      // Extrêmement lent pour l'intimité
-  passion: { pitch: '+15%', rate: '60%' }        // Ralenti pour plus de profondeur
+  anticipation: { pitch: '+5%', rate: '40%' },   // Limité à 40% au lieu de 55%
+  tension: { pitch: '+10%', rate: '45%' },       // Limité à 45% au lieu de 65%
+  relaxation: { pitch: '-5%', rate: '35%' },     // Ralenti davantage pour plus de détente
+  intimacy: { pitch: '-12%', rate: '30%' },      // Encore plus lent pour l'intimité
+  passion: { pitch: '+8%', rate: '40%' }         // Limité à 40% au lieu de 60%
 };
 
 /**
@@ -31,40 +31,40 @@ export const getVoiceSettings = (emotion: string, analysis: TextAnalysis): Voice
   logger.debug('Émotion:', emotion);
   logger.debug('Analyse:', analysis);
   
-  // Paramètres ajustés pour plus de sensualité et de profondeur
+  // Paramètres ajustés pour plus de sensualité, de profondeur et de variations naturelles
   const baseSettings: Record<string, VoiceSettings> = {
     sensuel: {
-      stability: 0.7,  // Augmenté pour plus de constance
-      similarity_boost: 0.9  // Augmenté pour plus d'expressivité
+      stability: 0.65,  // Légèrement réduit pour plus de variations naturelles
+      similarity_boost: 0.9  // Maintenu pour l'expressivité
     },
     excite: {
-      stability: 0.4,  // Légèrement augmenté
+      stability: 0.35,  // Réduit pour plus de variations émotionnelles
       similarity_boost: 0.95
     },
     jouissance: {
-      stability: 0.3,  // Légèrement augmenté
-      similarity_boost: 1.0
+      stability: 0.25,  // Réduit pour plus d'expressivité dans les moments intenses
+      similarity_boost: 0.98  // Presque maximal pour une forte expressivité
     },
     murmure: {
-      stability: 0.85, // Légèrement réduit pour plus de variation
-      similarity_boost: 0.8  // Augmenté pour plus d'expressivité
+      stability: 0.75, // Réduit pour plus de variations naturelles tout en gardant le contrôle
+      similarity_boost: 0.85  // Ajusté pour plus de naturel
     },
     intense: {
-      stability: 0.4,  // Légèrement augmenté
-      similarity_boost: 0.95 // Augmenté pour plus d'expressivité
+      stability: 0.35,  // Réduit pour plus de variations émotionnelles
+      similarity_boost: 0.95 // Maintenu pour l'expressivité
     },
     doux: {
-      stability: 0.75, // Légèrement réduit
-      similarity_boost: 0.85 // Augmenté pour plus d'expressivité
+      stability: 0.7, // Légèrement réduit
+      similarity_boost: 0.85 // Maintenu pour l'expressivité
     }
   };
 
   const settings = baseSettings[emotion] || baseSettings.sensuel;
   const adjustedSettings = {
     ...settings,
-    // Ajustements moins agressifs pour préserver la sensualité
-    stability: Math.max(0.3, Math.min(0.9, settings.stability * (1 - analysis.intensity * 0.3))),
-    similarity_boost: Math.max(0.6, Math.min(1.0, settings.similarity_boost + analysis.emotionalProgression * 0.15))
+    // Ajustements plus dynamiques pour une meilleure expressivité
+    stability: Math.max(0.2, Math.min(0.8, settings.stability * (1 - analysis.intensity * 0.4))),
+    similarity_boost: Math.max(0.7, Math.min(1.0, settings.similarity_boost + analysis.emotionalProgression * 0.2))
   };
 
   logger.debug('Paramètres ajustés:', adjustedSettings);

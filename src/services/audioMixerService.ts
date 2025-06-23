@@ -191,7 +191,7 @@ class AudioMixerService {
       );
       
       // Paramètres de crossfade
-      const defaultCrossfadeDuration = 0.5; // 500ms de crossfade par défaut
+      const defaultCrossfadeDuration = 0.3; // 300ms de crossfade par défaut (réduit pour éviter les chevauchements)
       
       // Charger et mixer chaque segment
       for (let i = 0; i < segments.length; i++) {
@@ -203,15 +203,28 @@ class AudioMixerService {
         
         // Calculer les paramètres de crossfade
         const nextSegment = i < segments.length - 1 ? segments[i + 1] : null;
-        // N'appliquer le crossfade que si le segment est suffisamment long (au moins 2x la durée du crossfade)
-        const crossfadeOut = nextSegment && segment.duration > defaultCrossfadeDuration * 2 ? 
-          Math.min(defaultCrossfadeDuration, (segment.duration * 0.2)) : 0;
+        
+        // Vérifier si les segments se chevauchent trop
+        const segmentEnd = segment.startTime + segment.duration;
+        const nextSegmentStart = nextSegment ? nextSegment.startTime : Infinity;
+        const overlap = segmentEnd - nextSegmentStart;
+        
+        // N'appliquer le crossfade que si le segment est suffisamment long et qu'il n'y a pas trop de chevauchement
+        let crossfadeOut = 0;
+        if (nextSegment && segment.duration > defaultCrossfadeDuration * 2) {
+          // Si les segments se chevauchent trop, réduire le crossfade
+          if (overlap > 0) {
+            crossfadeOut = Math.max(0, Math.min(defaultCrossfadeDuration * 0.5, segment.duration * 0.1));
+          } else {
+            crossfadeOut = Math.min(defaultCrossfadeDuration, segment.duration * 0.15);
+          }
+        }
         
         const fadeIn = segment.fadeIn || 0.1;
-        // Limiter le fadeOut à maximum 50% de la durée du segment
+        // Limiter le fadeOut à maximum 30% de la durée du segment (réduit de 50% à 30%)
         let fadeOut = segment.fadeOut || crossfadeOut;
-        if (fadeOut > segment.duration * 0.5) {
-          fadeOut = segment.duration * 0.5;
+        if (fadeOut > segment.duration * 0.3) {
+          fadeOut = segment.duration * 0.3;
         }
         
         logger.debug('Paramètres de fondu:', { fadeIn, fadeOut });
