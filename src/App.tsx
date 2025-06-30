@@ -40,6 +40,19 @@ const App: React.FC = () => {
   const [clipboardText, setClipboardText] = useState<string>('');
   const [selectedCharacter, setSelectedCharacter] = useState<string>('sasha'); // Sasha par défaut
 
+  // Fonction pour lire l'aperçu vocal
+  const playVoicePreview = (character: string) => {
+    try {
+      const audio = new Audio(`/voices/${character}.mp3`);
+      audio.volume = 0.7; // Volume modéré
+      audio.play().catch(err => {
+        console.error('Erreur lors de la lecture de l\'aperçu vocal:', err);
+      });
+    } catch (err) {
+      console.error('Erreur lors du chargement de l\'aperçu vocal:', err);
+    }
+  };
+
   // Récupérer le texte depuis sessionStorage lors du chargement initial
   useEffect(() => {
     try {
@@ -301,14 +314,23 @@ Je ne peux plus résister, l'intensité me submerge complètement !`;
           {/* Sélecteur de personnages */}
           <div className="character-selector">
             {CHARACTERS.map(character => (
-              <button
-                key={character.id}
-                className={`character-button ${selectedCharacter === character.id ? 'selected' : ''}`}
-                onClick={() => setSelectedCharacter(character.id)}
-                disabled={isLoading}
-              >
-                {character.name} - {character.description}
-              </button>
+              <div key={character.id} className="character-item">
+                <button
+                  className={`character-button ${selectedCharacter === character.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedCharacter(character.id)}
+                  disabled={isLoading}
+                >
+                  {character.name} - {character.description}
+                </button>
+                <button
+                  className="voice-preview-button"
+                  onClick={() => playVoicePreview(character.id)}
+                  disabled={isLoading}
+                  title={`Écouter un aperçu de la voix de ${character.name}`}
+                >
+                  🔊
+                </button>
+              </div>
             ))}
           </div>
           

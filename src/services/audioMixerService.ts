@@ -93,21 +93,144 @@ class AudioMixerService {
     return this.audioContext!.createGain();
   }
 
-  private applyFadeEffect(gainNode: GainNode, startTime: number, duration: number, fadeIn?: number, fadeOut?: number) {
+  private applyFadeEffect(gainNode: GainNode, startTime: number, duration: number, fadeIn?: number, fadeOut?: number, emotion?: string) {
     const currentTime = this.audioContext!.currentTime;
-    gainNode.gain.setValueAtTime(0, currentTime + startTime);
+    
+    // Utiliser des courbes logarithmiques pour des fondus plus naturels
+    gainNode.gain.setValueAtTime(0.001, currentTime + startTime); // Éviter la valeur 0 pour les courbes exponentielles
 
-    if (fadeIn) {
-      gainNode.gain.linearRampToValueAtTime(0, currentTime + startTime);
-      gainNode.gain.linearRampToValueAtTime(1, currentTime + startTime + fadeIn);
+    if (fadeIn && fadeIn > 0) {
+      // Courbe exponentielle pour un fondu d'entrée plus naturel
+      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + startTime);
+      gainNode.gain.exponentialRampToValueAtTime(1, currentTime + startTime + fadeIn);
     } else {
       gainNode.gain.setValueAtTime(1, currentTime + startTime);
     }
 
-    if (fadeOut) {
-      gainNode.gain.linearRampToValueAtTime(1, currentTime + startTime + duration - fadeOut);
-      gainNode.gain.linearRampToValueAtTime(0, currentTime + startTime + duration);
+    if (fadeOut && fadeOut > 0) {
+      // Maintenir le niveau jusqu'au début du fondu de sortie
+      gainNode.gain.setValueAtTime(1, currentTime + startTime + duration - fadeOut);
+      // Courbe exponentielle pour un fondu de sortie plus naturel
+      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + startTime + duration);
     }
+  }
+
+  /**
+   * Calcule la durée de crossfade adaptative entre deux segments
+   */
+  private calculateAdaptiveCrossfade(segment1: AudioSegment, segment2: AudioSegment): number {
+    const minDuration = Math.min(segment1.duration, segment2.duration);
+    
+    // Calculer la distance émotionnelle (approximation basée sur l'environnement)
+    const emotionalDistance = this.getEmotionalDistance(segment1.environment || 'default', segment2.environment || 'default');
+    
+    // Crossfade plus court pour émotions similaires, plus long pour transitions importantes
+    let baseCrossfade = emotionalDistance > 0.7 ? 0.4 : 0.15;
+    
+    // Limiter le crossfade à maximum 20% de la durée du segment le plus court
+    const maxCrossfade = minDuration * 0.2;
+    baseCrossfade = Math.min(baseCrossfade, maxCrossfade);
+    
+    // Minimum de 50ms pour éviter les clics
+    return Math.max(0.05, baseCrossfade);
+  }
+
+  /**
+   * Calcule la distance émotionnelle approximative entre deux environnements
+   */
+  private getEmotionalDistance(env1: string, env2: string): number {
+    const emotionalMap: Record<string, number> = {
+      'chambre': 0.5,
+      'plage': 0.3,
+      'forêt': 0.2,
+      'pluie': 0.4,
+      'ville': 0.8,
+      'default': 0.5
+    };
+    
+    const val1 = emotionalMap[env1] || 0.5;
+    const val2 = emotionalMap[env2] || 0.5;
+    
+    return Math.abs(val1 - val2);
+  }
+
+  /**
+   * Applique une compression dynamique contextuelle
+   */
+  private applyDynamicCompression(buffer: AudioBuffer, emotion?: string): void {
+    // Paramètres de compression selon l'émotion
+    const compressionParams = this.getCompressionParams(emotion);
+    
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      
+      for (let i = 0; i < channelData.length; i++) {
+        const sample = channelData[i];
+        const absSample = Math.abs(sample);
+        
+        if (absSample > compressionParams.threshold) {
+          // Appliquer la compression
+          const excess = absSample - compressionParams.threshold;
+          const compressedExcess = excess / compressionParams.ratio;
+          const newLevel = compressionParams.threshold + compressedExcess;
+          
+          channelData[i] = sample >= 0 ? newLevel : -newLevel;
+        }
+      }
+    }
+  }
+
+  /**
+   * Obtient les paramètres de compression selon l'émotion
+   */
+  private getCompressionParams(emotion?: string): { threshold: number; ratio: number } {
+    switch (emotion) {
+      case 'murmure':
+        return { threshold: 0.3, ratio: 2 }; // Compression douce pour préserver les nuances
+      case 'jouissance':
+        return { threshold: 0.6, ratio: 4 }; // Compression plus forte pour contrôler les pics
+      case 'excite':
+        return { threshold: 0.5, ratio: 3 };
+      case 'sensuel':
+        return { threshold: 0.4, ratio: 2.5 };
+      default:
+        return { threshold: 0.5, ratio: 2.5 };
+    }
+  }
+
+  /**
+   * Calcule le volume d'environnement avec ducking intelligent
+   */
+  private calculateEnvironmentVolume(baseVolume: number, voiceIntensity: number, emotion?: string): number {
+    // Facteur de ducking selon l'émotion
+    const duckingFactor = emotion === 'murmure' ? 0.3 : 
+                         emotion === 'jouissance' ? 0.8 : 
+                         emotion === 'excite' ? 0.7 : 0.6;
+    
+    // Réduire l'ambiance quand la voix est intense
+    const duckingReduction = voiceIntensity * duckingFactor;
+    return baseVolume * (1 - duckingReduction);
+  }
+
+  /**
+   * Estime l'intensité vocale approximative basée sur l'environnement
+   */
+  private estimateVoiceIntensity(environment?: string): number {
+    // Mapping approximatif environnement -> intensité vocale probable
+    const intensityMap: Record<string, number> = {
+      'chambre': 0.7,     // Environnement intime, voix probablement intense
+      'plage': 0.4,       // Environnement relaxant, voix plus douce
+      'forêt': 0.3,       // Environnement calme, voix douce
+      'pluie': 0.5,       // Environnement méditatif, voix modérée
+      'ville': 0.6,       // Environnement urbain, voix modérément intense
+      'murmure': 0.2,     // Voix très douce
+      'jouissance': 0.9,  // Voix très intense
+      'excite': 0.8,      // Voix intense
+      'sensuel': 0.6,     // Voix modérément intense
+      'default': 0.5      // Intensité moyenne par défaut
+    };
+    
+    return intensityMap[environment || 'default'] || 0.5;
   }
 
   private normalizeBuffer(buffer: AudioBuffer, targetLevel: number = 0.9): void {
@@ -193,47 +316,57 @@ class AudioMixerService {
       // Paramètres de crossfade
       const defaultCrossfadeDuration = 0.3; // 300ms de crossfade par défaut (réduit pour éviter les chevauchements)
       
-      // Charger et mixer chaque segment
+      // Charger et mixer chaque segment avec les nouvelles améliorations
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
+        const nextSegment = i < segments.length - 1 ? segments[i + 1] : null;
+        
         logger.debug('Traitement du segment:', i, segment);
         
         // Charger le buffer audio
         const buffer = await this.fetchAudioBuffer(segment.audioUrl);
         
-        // Calculer les paramètres de crossfade
-        const nextSegment = i < segments.length - 1 ? segments[i + 1] : null;
+        // Appliquer la compression dynamique selon l'environnement (approximation de l'émotion)
+        this.applyDynamicCompression(buffer, segment.environment);
         
-        // Vérifier si les segments se chevauchent trop
-        const segmentEnd = segment.startTime + segment.duration;
-        const nextSegmentStart = nextSegment ? nextSegment.startTime : Infinity;
-        const overlap = segmentEnd - nextSegmentStart;
-        
-        // N'appliquer le crossfade que si le segment est suffisamment long et qu'il n'y a pas trop de chevauchement
+        // Calculer le crossfade adaptatif
         let crossfadeOut = 0;
-        if (nextSegment && segment.duration > defaultCrossfadeDuration * 2) {
-          // Si les segments se chevauchent trop, réduire le crossfade
-          if (overlap > 0) {
-            crossfadeOut = Math.max(0, Math.min(defaultCrossfadeDuration * 0.5, segment.duration * 0.1));
-          } else {
-            crossfadeOut = Math.min(defaultCrossfadeDuration, segment.duration * 0.15);
-          }
+        if (nextSegment) {
+          crossfadeOut = this.calculateAdaptiveCrossfade(segment, nextSegment);
         }
         
-        const fadeIn = segment.fadeIn || 0.1;
-        // Limiter le fadeOut à maximum 30% de la durée du segment (réduit de 50% à 30%)
+        // Calculer les paramètres de fondu optimisés
+        const fadeIn = segment.fadeIn || 0.08; // Réduit de 0.1 à 0.08 pour plus de fluidité
         let fadeOut = segment.fadeOut || crossfadeOut;
-        if (fadeOut > segment.duration * 0.3) {
-          fadeOut = segment.duration * 0.3;
+        
+        // Limiter le fadeOut à maximum 25% de la durée du segment (réduit de 30% à 25%)
+        if (fadeOut > segment.duration * 0.25) {
+          fadeOut = segment.duration * 0.25;
         }
         
-        logger.debug('Paramètres de fondu:', { fadeIn, fadeOut });
+        // Calculer l'intensité vocale approximative pour le ducking
+        const voiceIntensity = this.estimateVoiceIntensity(segment.environment);
+        
+        // Ajuster le volume avec ducking intelligent si c'est un son d'environnement
+        let adjustedVolume = segment.volume || 1.0;
+        if (segment.environment && segment.volume && segment.volume < 0.5) {
+          // C'est probablement un son d'environnement, appliquer le ducking
+          adjustedVolume = this.calculateEnvironmentVolume(segment.volume, voiceIntensity, segment.environment);
+        }
+        
+        logger.debug('Paramètres de fondu optimisés:', { 
+          fadeIn, 
+          fadeOut, 
+          crossfadeOut, 
+          adjustedVolume,
+          voiceIntensity 
+        });
         
         // Calculer les positions en échantillons
         const startSample = Math.floor(segment.startTime * sampleRate);
         const segmentSamples = buffer.length;
         
-        // Mixer le segment dans le buffer principal
+        // Mixer le segment dans le buffer principal avec courbes exponentielles
         for (let channel = 0; channel < 2; channel++) {
           const mixChannelData = mixBuffer.getChannelData(channel);
           const segmentChannelData = buffer.getChannelData(Math.min(channel, buffer.numberOfChannels - 1));
@@ -242,17 +375,21 @@ class AudioMixerService {
             const targetSample = startSample + s;
             if (targetSample >= totalSamples) break;
             
-            // Appliquer les fondus
-            let gain = segment.volume || 1.0;
+            // Appliquer les fondus avec courbes exponentielles pour plus de naturel
+            let gain = adjustedVolume;
             
-            // Fondu d'entrée
+            // Fondu d'entrée avec courbe exponentielle
             if (s < fadeIn * sampleRate) {
-              gain *= s / (fadeIn * sampleRate);
+              const fadeProgress = s / (fadeIn * sampleRate);
+              // Courbe exponentielle douce (éviter 0 pour éviter -Infinity)
+              gain *= Math.pow(Math.max(0.001, fadeProgress), 0.5);
             }
             
-            // Fondu de sortie
+            // Fondu de sortie avec courbe exponentielle
             if (s > segmentSamples - (fadeOut * sampleRate)) {
-              gain *= (segmentSamples - s) / (fadeOut * sampleRate);
+              const fadeProgress = (segmentSamples - s) / (fadeOut * sampleRate);
+              // Courbe exponentielle douce
+              gain *= Math.pow(Math.max(0.001, fadeProgress), 0.5);
             }
             
             // Mixer avec le contenu existant (addition)

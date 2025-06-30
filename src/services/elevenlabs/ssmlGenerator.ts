@@ -144,12 +144,99 @@ export const addBreathingAndPauses = (text: string, emotion: string, analysis: T
 };
 
 /**
- * Génère le SSML pour un segment avec des paramètres spécifiques
+ * Génère des micro-variations naturelles pour les paramètres prosodiques
+ */
+const generateNaturalVariations = (baseValue: string, variationRange: number = 2): string => {
+  // Extraire la valeur numérique du paramètre (ex: "-10%" -> -10)
+  const numericValue = parseFloat(baseValue.replace('%', ''));
+  
+  // Ajouter une variation aléatoire dans la plage spécifiée
+  const variation = (Math.random() - 0.5) * 2 * variationRange;
+  const newValue = numericValue + variation;
+  
+  // Retourner la nouvelle valeur formatée
+  return `${newValue >= 0 ? '+' : ''}${newValue.toFixed(1)}%`;
+};
+
+/**
+ * Calcule les paramètres prosodiques optimisés selon l'émotion et l'intensité
+ */
+const calculateOptimizedProsody = (
+  emotion: string, 
+  analysis: TextAnalysis, 
+  options: { pitch?: string; rate?: string } = {}
+): { pitch: string; rate: string; volume: string } => {
+  // Paramètres de base selon l'émotion avec micro-variations
+  let basePitch: string;
+  let baseRate: string;
+  let volume: string;
+  
+  switch (emotion) {
+    case 'jouissance':
+      basePitch = generateNaturalVariations(options.pitch || '+8%', 3);
+      baseRate = generateNaturalVariations(options.rate || '42%', 2); // Réduit de 45% à 42%
+      volume = 'loud';
+      break;
+    case 'excite':
+      basePitch = generateNaturalVariations(options.pitch || '+3%', 2);
+      baseRate = generateNaturalVariations(options.rate || '38%', 2); // Réduit de 40% à 38%
+      volume = 'medium-loud';
+      break;
+    case 'murmure':
+      basePitch = generateNaturalVariations(options.pitch || '-18%', 2);
+      baseRate = generateNaturalVariations(options.rate || '25%', 1);
+      volume = 'soft';
+      break;
+    case 'sensuel':
+      basePitch = generateNaturalVariations(options.pitch || '-12%', 2);
+      baseRate = generateNaturalVariations(options.rate || '30%', 1.5);
+      volume = 'medium-soft';
+      break;
+    case 'intense':
+      basePitch = generateNaturalVariations(options.pitch || '+0%', 3);
+      baseRate = generateNaturalVariations(options.rate || '36%', 2); // Réduit de 38% à 36%
+      volume = 'medium-loud';
+      break;
+    default:
+      basePitch = generateNaturalVariations(options.pitch || '-8%', 2); // Réduit de -10% à -8%
+      baseRate = generateNaturalVariations(options.rate || '33%', 2); // Réduit de 35% à 33%
+      volume = 'medium';
+  }
+  
+  // Ajustements selon l'intensité de l'analyse
+  if (analysis.intensity > 0.8) {
+    // Forte intensité : augmenter légèrement le pitch et limiter la vitesse
+    const pitchAdjustment = emotion === 'murmure' ? -2 : +3;
+    const currentPitch = parseFloat(basePitch.replace(/[+%]/g, ''));
+    basePitch = `${currentPitch + pitchAdjustment >= 0 ? '+' : ''}${(currentPitch + pitchAdjustment).toFixed(1)}%`;
+    
+    // Limiter la vitesse maximale même pour forte intensité
+    const currentRate = parseFloat(baseRate.replace('%', ''));
+    if (currentRate > 42) {
+      baseRate = '42.0%'; // Limite absolue
+    }
+  } else if (analysis.intensity < 0.3) {
+    // Faible intensité : diminuer pitch et vitesse
+    const pitchAdjustment = -3;
+    const rateAdjustment = -3;
+    
+    const currentPitch = parseFloat(basePitch.replace(/[+%]/g, ''));
+    const currentRate = parseFloat(baseRate.replace('%', ''));
+    
+    basePitch = `${currentPitch + pitchAdjustment >= 0 ? '+' : ''}${(currentPitch + pitchAdjustment).toFixed(1)}%`;
+    baseRate = `${Math.max(20, currentRate + rateAdjustment).toFixed(1)}%`; // Minimum 20%
+  }
+  
+  return { pitch: basePitch, rate: baseRate, volume };
+};
+
+/**
+ * Génère le SSML pour un segment avec des paramètres spécifiques optimisés
  * @param segment Le texte du segment
  * @param emotion L'émotion dominante
  * @param analysis L'analyse du texte
  * @param options Options supplémentaires (pitch, rate)
- * @returns Le SSML généré
+ * @returns Le SSML généré et optimisé
  */
 export const generateSegmentSSML = (
   segment: string, 
@@ -157,70 +244,18 @@ export const generateSegmentSSML = (
   analysis: TextAnalysis, 
   options: { pitch?: string; rate?: string } = {}
 ): string => {
-  // Adapter le pitch et le rate en fonction de l'émotion et de l'analyse
-  let basePitch = options.pitch || '-10%';
-  let baseRate = options.rate || '35%';
-  
-  // Ajuster le pitch en fonction de l'émotion avec plus de nuances
-  if (emotion === 'jouissance') {
-    // Pour la jouissance, utiliser un pitch plus aigu
-    basePitch = options.pitch || '+8%';
-  } else if (emotion === 'excite') {
-    // Pour l'excitation, utiliser un pitch légèrement plus aigu
-    basePitch = options.pitch || '+3%';
-  } else if (emotion === 'murmure') {
-    // Pour les murmures, utiliser un pitch plus grave
-    basePitch = options.pitch || '-18%';
-  } else if (emotion === 'sensuel') {
-    // Pour le ton sensuel, utiliser un pitch légèrement grave
-    basePitch = options.pitch || '-12%';
-  } else if (emotion === 'intense') {
-    // Pour le ton intense, utiliser un pitch variable
-    basePitch = options.pitch || '+0%';
-  }
-  
-  // Ajuster le rate en fonction de l'émotion avec une limite maximale
-  if (emotion === 'jouissance') {
-    // Pour la jouissance, parler plus rapidement mais pas trop
-    baseRate = options.rate || '45%'; // Limité à 45% au lieu de 55%
-  } else if (emotion === 'excite') {
-    // Pour l'excitation, parler un peu plus rapidement
-    baseRate = options.rate || '40%'; // Limité à 40% au lieu de 45%
-  } else if (emotion === 'murmure') {
-    // Pour les murmures, parler plus lentement
-    baseRate = options.rate || '25%';
-  } else if (emotion === 'sensuel') {
-    // Pour le ton sensuel, parler lentement
-    baseRate = options.rate || '30%';
-  } else if (emotion === 'intense') {
-    // Pour le ton intense, parler à vitesse modérée
-    baseRate = options.rate || '38%';
-  }
-  
-  // Ajuster en fonction de l'intensité de l'analyse avec limites
-  if (analysis.intensity > 0.8) {
-    // Pour une forte intensité, ajuster le pitch et la vitesse avec limites
-    basePitch = options.pitch || (emotion === 'murmure' ? '-15%' : '+10%');
-    // Limiter la vitesse maximale à 45% même pour une forte intensité
-    baseRate = options.rate || (emotion === 'murmure' ? '28%' : '45%');
-  } else if (analysis.intensity < 0.3) {
-    // Pour une faible intensité, diminuer légèrement le pitch et la vitesse
-    basePitch = options.pitch || '-15%';
-    baseRate = options.rate || '25%';
-  }
+  // Calculer les paramètres prosodiques optimisés
+  const prosody = calculateOptimizedProsody(emotion, analysis, options);
   
   // Ajouter des variations micro-prosodiques pour plus de naturel
   const processedSegment = addBreathingAndPauses(segment, emotion, analysis);
   
-  // Ajouter des balises SSML avancées pour l'ensemble du segment
+  // Générer un SSML simplifié et optimisé pour ElevenLabs
+  // Éviter les balises Amazon non supportées
   return `<speak>
-    <amazon:auto-breaths frequency="medium" volume="x-soft" duration="medium">
-      <amazon:effect vocal-tract-length="+10%">
-        <prosody pitch="${basePitch}" rate="${baseRate}" volume="${emotion === 'murmure' ? 'soft' : emotion === 'jouissance' ? 'loud' : 'medium'}">
-          ${processedSegment}
-        </prosody>
-      </amazon:effect>
-    </amazon:auto-breaths>
+    <prosody pitch="${prosody.pitch}" rate="${prosody.rate}" volume="${prosody.volume}">
+      ${processedSegment}
+    </prosody>
   </speak>`;
 };
 
