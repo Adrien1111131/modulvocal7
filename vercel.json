@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "vite-react-elevenlabs-app/server/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "vite-react-elevenlabs-app/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "vite-react-elevenlabs-app/dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "vite-react-elevenlabs-app/server/server.js"
+    },
+    {
+      "src": "/audio/(.*)",
+      "dest": "vite-react-elevenlabs-app/server/server.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

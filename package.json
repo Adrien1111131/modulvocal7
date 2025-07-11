@@ -1,0 +1,16 @@
+{
+  "name": "modulvocal7",
+  "version": "1.0.0",
+  "description": "Module vocal avec React et ElevenLabs API",
+  "type": "module",
+  "scripts": {
+    "build": "cd vite-react-elevenlabs-app && npm install && npm run build",
+    "dev": "cd vite-react-elevenlabs-app && npm run dev",
+    "preview": "cd vite-react-elevenlabs-app && npm run preview"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": ["react", "vite", "elevenlabs", "voice"],
+  "author": "",
+  "license": "ISC"
+}
