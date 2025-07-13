@@ -26,7 +26,7 @@ const RandomImageDisplay: React.FC<RandomImageDisplayProps> = ({ isPlaying, onIm
       if (randomImageService.isReady()) {
         const firstImage = randomImageService.getRandomImageUrl();
         setCurrentImage(firstImage);
-        if (onImageChange) {
+        if (onImageChange && firstImage) {
           onImageChange(firstImage);
         }
       }
@@ -41,7 +41,7 @@ const RandomImageDisplay: React.FC<RandomImageDisplayProps> = ({ isPlaying, onIm
     if (isPlaying && randomImageService.isReady()) {
       const newImage = randomImageService.getRandomImageUrl();
       setCurrentImage(newImage);
-      if (onImageChange) {
+      if (onImageChange && newImage) {
         onImageChange(newImage);
       }
     }
@@ -52,7 +52,7 @@ const RandomImageDisplay: React.FC<RandomImageDisplayProps> = ({ isPlaying, onIm
     if (randomImageService.isReady()) {
       const newImage = randomImageService.getRandomImageUrl();
       setCurrentImage(newImage);
-      if (onImageChange) {
+      if (onImageChange && newImage) {
         onImageChange(newImage);
       }
     }
